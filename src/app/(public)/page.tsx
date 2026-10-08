@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import type { MatchWithTeams, MatchEvent, Sponsor } from '@/lib/types';
 import { formatShortDate, formatTime, todayWIB, getMatchPartai } from '@/lib/utils';
 import { useCategory } from '@/hooks/useCategory';
@@ -39,11 +38,6 @@ export default function DashboardPage() {
     subtitle: '',
     src: '',
   });
-
-  // State kontrol pemutar video teaser di section 2
-  const teaserVideoRef = useRef<HTMLVideoElement>(null);
-  const [isTeaserPlaying, setIsTeaserPlaying] = useState(true);
-  const [isTeaserMuted, setIsTeaserMuted] = useState(true);
 
   // Ambil daftar tanggal yang ada dalam turnamen
   const tournamentDates = useMemo(() => {
@@ -92,25 +86,6 @@ export default function DashboardPage() {
     return sponsors.filter((s) => s.active);
   }, [sponsors]);
 
-  // Helper toggle play/pause teaser video
-  const toggleTeaserPlay = () => {
-    if (!teaserVideoRef.current) return;
-    if (teaserVideoRef.current.paused) {
-      void teaserVideoRef.current.play();
-      setIsTeaserPlaying(true);
-    } else {
-      teaserVideoRef.current.pause();
-      setIsTeaserPlaying(false);
-    }
-  };
-
-  // Helper toggle mute/unmute teaser video
-  const toggleTeaserMute = () => {
-    if (!teaserVideoRef.current) return;
-    teaserVideoRef.current.muted = !teaserVideoRef.current.muted;
-    setIsTeaserMuted(teaserVideoRef.current.muted);
-  };
-
   // Buka pamflet modal
   const handleOpenPamphlet = (match: MatchWithTeams) => {
     fetch(`/api/matches/${match.id}/events`)
@@ -127,245 +102,110 @@ export default function DashboardPage() {
   return (
     <div className="space-y-12 sm:space-y-16 lg:space-y-20 pb-16">
       {/* ============================================================== */}
-      {/* SECTION 1: SAMPUL TURNAMEN RESMI (SAMPUL.PNG HERO COVER)      */}
+      {/* SECTION 1: SAMPUL TURNAMEN RESMI (CLEAN & MINIMALIST COVER)   */}
       {/* ============================================================== */}
-      <section className="relative pt-2">
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-[32px] border border-cyan-500/30 bg-slate-950 shadow-2xl group">
+      <section className="relative pt-1 sm:pt-2">
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-800/80 bg-slate-950 shadow-2xl transition-all duration-300 hover:border-cyan-500/30">
           {/* Ambient Lighting di sekeliling bingkai sampul */}
-          <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-cyan-500/20 blur-[100px] pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-emerald-500/20 blur-[100px] pointer-events-none" />
+          <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-cyan-500/15 blur-[90px] pointer-events-none" />
+          <div className="absolute -bottom-20 -right-20 w-72 h-72 rounded-full bg-emerald-500/15 blur-[90px] pointer-events-none" />
 
-          {/* Banner Sampul */}
+          {/* Banner Sampul Murni & Bersih */}
           <div className="relative aspect-[1440/850] sm:aspect-[1440/900] md:aspect-[1440/1024] w-full overflow-hidden bg-slate-900">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/Sampul.png"
               alt="Sampul Resmi An-Nur Mini Soccer Championship 2026"
-              className="h-full w-full object-cover object-center transform transition-transform duration-700 group-hover:scale-[1.01]"
+              className="h-full w-full object-cover object-center"
               loading="eager"
             />
-            {/* Gradient shadow halus di bagian bawah gambar sampul agar menyatu */}
-            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent pointer-events-none" />
-          </div>
-
-          {/* Quick Action Navigation Bar di bawah Sampul */}
-          <div className="relative z-10 border-t border-slate-800 bg-slate-950/90 px-4 py-4 sm:px-8 sm:py-5 backdrop-blur-md">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  TURNAMEN RESMI 2026
-                </span>
-                <span className="text-slate-400 hidden sm:inline">•</span>
-                <span className="text-slate-300 font-semibold">
-                  Kategori U-10 & U-12
-                </span>
-                <span className="text-slate-400 hidden sm:inline">•</span>
-                <span className="text-cyan-300 font-semibold">
-                  Lapangan 1 & 2 Ponpes An-Nur
-                </span>
-              </div>
-
-              {/* Tombol Aksi Cepat */}
-              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-center md:justify-end">
-                <a
-                  href="#jadwal-hari-ini"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-xs font-black text-white shadow-md shadow-blue-500/20 transition-all active:scale-95"
-                >
-                  <span>📅</span>
-                  <span>Jadwal Laga</span>
-                </a>
-                <Link
-                  href="/bagan"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs font-bold text-slate-200 transition-all active:scale-95"
-                >
-                  <span>🏆</span>
-                  <span>Bagan Gugur</span>
-                </Link>
-                <Link
-                  href="/live"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs font-bold text-slate-200 transition-all active:scale-95"
-                >
-                  <span>⚡</span>
-                  <span>Live Score</span>
-                </Link>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
       {/* ============================================================== */}
-      {/* SECTION 2: TENTANG AN-NUR MINI SOCCER (SPLIT: LOGOVID & INFO) */}
+      {/* SECTION 2: TENTANG AN-NUR MINI SOCCER (RINGKAS & ELEGAN)       */}
       {/* ============================================================== */}
       <section className="relative">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-          {/* SISI 1: VIDEO TEASER (LOGOVID.MP4) */}
-          <div className="lg:col-span-5 relative">
-            <div className="relative rounded-3xl overflow-hidden border-2 border-cyan-500/40 bg-slate-950 shadow-2xl shadow-cyan-500/10 group">
-              {/* Glow Accent di Belakang Video */}
-              <div className="absolute -inset-4 bg-gradient-to-br from-cyan-500/25 via-blue-600/20 to-emerald-500/20 rounded-3xl blur-2xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-800/80 bg-slate-950/80 p-5 sm:p-7 lg:p-8 shadow-xl backdrop-blur-md">
+          {/* Ambient Glow */}
+          <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none" />
 
-              {/* Video Element */}
-              <div className="relative aspect-[9/16] sm:aspect-video lg:aspect-[4/5] w-full overflow-hidden bg-black flex items-center justify-center">
-                <video
-                  ref={teaserVideoRef}
-                  src="/logovid.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover object-center"
-                />
-
-                {/* Cyber Watermark Badges */}
-                <div className="absolute top-3 left-3 z-20">
-                  <span className="px-2.5 py-1 rounded-lg bg-black/70 border border-cyan-400/50 text-[10px] font-mono font-bold text-cyan-300 backdrop-blur-md uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                    OFFICIAL TEASER
-                  </span>
-                </div>
-                <div className="absolute top-3 right-3 z-20">
-                  <span className="px-2 py-1 rounded-lg bg-black/70 border border-slate-700 text-[10px] font-mono font-bold text-slate-300 backdrop-blur-md">
-                    1080P HD
-                  </span>
-                </div>
-
-                {/* Kontrol Overlay Pemutar */}
-                <div className="absolute bottom-3 inset-x-3 z-20 flex items-center justify-between p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 backdrop-blur-md">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={toggleTeaserPlay}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs transition-colors"
-                      title={isTeaserPlaying ? 'Jeda Video' : 'Putar Video'}
-                    >
-                      {isTeaserPlaying ? '⏸' : '▶'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={toggleTeaserMute}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs transition-colors"
-                      title={isTeaserMuted ? 'Nyalakan Suara' : 'Matikan Suara'}
-                    >
-                      {isTeaserMuted ? '🔇' : '🔊'}
-                    </button>
-                    <span className="text-[11px] font-mono text-slate-300 font-semibold pl-1">
-                      An-Nur Mini Soccer 2026
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveVideoModal({
-                        isOpen: true,
-                        title: 'Official Teaser An-Nur Mini Soccer 2026',
-                        subtitle: 'Turnamen Usia Dini Bergengsi Jawa Timur',
-                        src: '/logovid.mp4',
-                      })
-                    }
-                    className="p-1.5 rounded-lg bg-blue-600/40 hover:bg-blue-600/60 text-cyan-200 text-xs border border-blue-400/40 transition-colors"
-                    title="Perbesar Layar Penuh"
-                  >
-                    ⛶ Layar Penuh
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SISI 2: PENJELASAN TENTANG AN-NUR MINI SOCCER */}
-          <div className="lg:col-span-7 space-y-5">
+          <div className="relative z-10 space-y-5">
+            {/* Header Ringkas */}
             <div className="space-y-2">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-xs font-mono font-bold text-cyan-300 tracking-wider uppercase">
-                <span>⚽</span>
-                <span>TENTANG TURNAMEN RESMI</span>
-              </span>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white font-display tracking-tight leading-tight">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-[11px] font-mono font-bold text-cyan-300 tracking-wider uppercase">
+                  <span>⚽</span>
+                  <span>TENTANG TURNAMEN</span>
+                </span>
+                <span className="text-xs text-slate-500 font-mono hidden sm:inline">•</span>
+                <span className="text-xs text-slate-400 font-mono hidden sm:inline">
+                  9–10 Oktober 2026 · Tanggulangin, Sidoarjo
+                </span>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white font-display tracking-tight">
                 An-Nur Mini Soccer Championship 2026
               </h2>
-              <p className="text-sm sm:text-base text-cyan-200/90 font-medium">
-                Pesta Sepak Bola Usia Dini Bergengsi: Menempa Bakat, Mengukir Prestasi, dan Membangun Karakter Santri Berakhlak Mulia.
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl">
+                Kompetisi sepak bola usia dini resmi yang diselenggarakan oleh{' '}
+                <strong className="text-white font-semibold">Yayasan Pondok Pesantren An-Nur Sidoarjo</strong> bersama{' '}
+                <strong className="text-cyan-300 font-semibold">Askab PSSI Sidoarjo (PSSQ)</strong>. Menghadirkan ajang pembinaan talenta muda kategori{' '}
+                <span className="text-emerald-400 font-bold">U-10</span> dan{' '}
+                <span className="text-amber-400 font-bold">U-12</span> se-Jawa Timur dengan standar kompetisi dan fasilitas lapangan prima.
               </p>
             </div>
 
-            <div className="space-y-3.5 text-sm text-slate-300 leading-relaxed">
-              <p>
-                <strong>An-Nur Mini Soccer Championship 2026</strong> diselenggarakan oleh{' '}
-                <span className="text-white font-semibold">Yayasan Pondok Pesantren An-Nur Sidoarjo</span> bekerja sama dengan{' '}
-                <span className="text-white font-semibold">Askab PSSI Sidoarjo (PSSQ)</span>. Turnamen ini menjadi panggung kompetitif resmi untuk mengasah potensi pesepak bola usia dini dari SSB dan akademi se-Jawa Timur.
-              </p>
-              <p>
-                Dengan mengusung semangat sportivitas dan ukhuwah islamiyah, kompetisi dibagi ke dalam 2 kelompok umur:{' '}
-                <span className="text-emerald-400 font-bold">Kategori U-10 (Kelahiran 2016)</span> dan{' '}
-                <span className="text-amber-400 font-bold">Kategori U-12 (Kelahiran 2014)</span>.
-              </p>
-            </div>
-
-            {/* 4 Pilar Keunggulan Turnamen (Grid 2x2 Futuristik) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
-              <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-cyan-500/40 transition-colors">
-                <div className="flex items-start gap-3">
-                  <span className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 text-lg flex-none">
-                    🏟️
-                  </span>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase font-mono">
-                      2 Lapangan Standar
-                    </h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                      Pertandingan berjalan serempak di Lapangan 1 & 2 dengan rumput sintetis prima.
-                    </p>
-                  </div>
+            {/* 4 Highlight Ringkas & Futuristik */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pt-1">
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-cyan-500/40 transition-colors">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">🏟️</span>
+                  <h3 className="text-xs font-bold text-white font-mono uppercase">
+                    2 Lapangan Standar
+                  </h3>
                 </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Rumput sintetis prima di Lapangan 1 & 2
+                </p>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition-colors">
-                <div className="flex items-start gap-3">
-                  <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 text-lg flex-none">
-                    ⚡
-                  </span>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase font-mono">
-                      Live Scoring & Pamflet
-                    </h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                      Pencatatan skor real-time dengan fitur unduh pamflet resmi rasio 1080x1350.
-                    </p>
-                  </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-emerald-500/40 transition-colors">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">⚡</span>
+                  <h3 className="text-xs font-bold text-white font-mono uppercase">
+                    Live Score Digital
+                  </h3>
                 </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Update real-time & pamflet laga otomatis
+                </p>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-blue-500/40 transition-colors">
-                <div className="flex items-start gap-3">
-                  <span className="p-2 rounded-xl bg-blue-500/20 text-blue-400 text-lg flex-none">
-                    📜
-                  </span>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase font-mono">
-                      Rekomendasi Askab PSSI
-                    </h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                      Dipantau oleh pemandu bakat Askab PSSI Sidoarjo (PSSQ) untuk pembinaan berkelanjutan.
-                    </p>
-                  </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-blue-500/40 transition-colors">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">📜</span>
+                  <h3 className="text-xs font-bold text-white font-mono uppercase">
+                    Pemandu Bakat PSSI
+                  </h3>
                 </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Pantauan resmi Askab PSSI Sidoarjo (PSSQ)
+                </p>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-500/40 transition-colors">
-                <div className="flex items-start gap-3">
-                  <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 text-lg flex-none">
-                    🎓
-                  </span>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase font-mono">
-                      Beasiswa Inden 40%
-                    </h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                      Potongan beasiswa jalur inden untuk santri baru di MTs Mubosta & MA An-Nur.
-                    </p>
-                  </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-amber-500/40 transition-colors">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">🎓</span>
+                  <h3 className="text-xs font-bold text-white font-mono uppercase">
+                    Beasiswa Inden 40%
+                  </h3>
                 </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Potongan santri MTs Mubosta & MA An-Nur
+                </p>
               </div>
             </div>
           </div>
