@@ -243,6 +243,17 @@ export default function PetugasLapanganPage() {
               <span>➜</span>
             </Link>
 
+            {/* Tombol Buka Layar TV Lapangan */}
+            <Link
+              href={`/tv?lapangan=${field}`}
+              target="_blank"
+              className="label rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2 sm:px-2.5 py-1 sm:py-1.5 text-[11px] text-cyan-300 hover:bg-cyan-500/20 transition-colors flex items-center gap-1"
+              title="Buka Layar TV Scoreboard untuk Lapangan ini"
+            >
+              <span>📺</span>
+              <span className="hidden sm:inline">Layar TV</span>
+            </Link>
+
             {/* Tombol Kunci Konsol */}
             <button
               type="button"

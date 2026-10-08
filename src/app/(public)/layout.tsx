@@ -45,6 +45,14 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                     {item.name}
                   </Link>
                 ))}
+                <Link
+                  href="/tv"
+                  className="label rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-1.5 text-xs text-cyan-300 font-bold hover:bg-cyan-500/20 transition-all flex items-center gap-1.5 ml-1"
+                  title="Buka Layar TV Scoreboard Realtime"
+                >
+                  <span>📺</span>
+                  <span>Layar TV</span>
+                </Link>
               </nav>
             </div>
           </div>

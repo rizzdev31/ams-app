@@ -31,6 +31,9 @@ export default function LayoutFooter() {
           <Link href="/live" className="hover:text-blue">
             Skor live
           </Link>
+          <Link href="/tv" className="hover:text-blue text-cyan-400 font-semibold">
+            📺 Layar TV
+          </Link>
           <Link href="/info" className="hover:text-blue">
             Info
           </Link>

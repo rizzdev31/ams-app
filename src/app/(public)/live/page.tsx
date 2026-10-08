@@ -38,15 +38,60 @@ export default function LivePage() {
           Skor live
         </h1>
         <div className="flex items-center gap-3">
-          <span className="label text-muted" aria-live="polite">
-            {lastUpdated ? `Diperbarui ${lastUpdated}` : 'Memuat…'}
-          </span>
+          <Link
+            href="/tv"
+            className="label rounded-full bg-gradient-to-r from-blue to-cyan-400 px-4 py-2.5 font-black text-ink shadow-[0_0_15px_rgba(91,141,255,0.4)] hover:brightness-110 transition-all flex items-center gap-1.5"
+          >
+            <span>📺</span>
+            <span>Buka Mode Layar TV</span>
+          </Link>
           <button
             onClick={reload}
             className="label rounded-full border border-line px-4 py-2.5 text-muted transition-colors hover:border-blue/50 hover:text-text"
           >
             Muat ulang
           </button>
+        </div>
+      </div>
+
+      {/* Banner Khusus Mode Layar TV / Scoreboard Display */}
+      <div className="mt-6 rounded-3xl border border-blue-500/30 bg-gradient-to-r from-blue-950/40 via-surface to-emerald-950/40 p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xl flex-none">
+            📺
+          </div>
+          <div>
+            <h3 className="font-display font-extrabold text-sm sm:text-base text-text">
+              Mode Layar TV & Papan Skor Lapangan
+            </h3>
+            <p className="text-xs text-muted">
+              Tampilan fullscreen khusus monitor/TV stadion per lapangan dengan skor raksasa dan auto-refresh instan.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href="/tv?lapangan=1"
+            className="label rounded-full bg-blue text-ink px-3.5 py-2 font-bold hover:brightness-110 transition-all text-xs flex items-center gap-1.5 shadow-sm"
+          >
+            <span>TV Lap 1</span>
+            <span>↗</span>
+          </Link>
+          <Link
+            href="/tv?lapangan=2"
+            className="label rounded-full bg-emerald-500 text-ink px-3.5 py-2 font-bold hover:brightness-110 transition-all text-xs flex items-center gap-1.5 shadow-sm"
+          >
+            <span>TV Lap 2</span>
+            <span>↗</span>
+          </Link>
+          <Link
+            href="/tv?lapangan=split"
+            className="label rounded-full border border-purple-500/50 bg-purple-500/15 text-purple-300 px-3.5 py-2 font-bold hover:bg-purple-500/25 transition-all text-xs flex items-center gap-1.5"
+          >
+            <span>Layar Ganda (1 & 2)</span>
+            <span>↗</span>
+          </Link>
         </div>
       </div>
 

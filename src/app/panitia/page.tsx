@@ -197,6 +197,14 @@ export default function SkorTab() {
             <span>Layar Lap 2</span>
             <span>↗</span>
           </Link>
+          <Link
+            href="/tv"
+            target="_blank"
+            className="label rounded-full border border-cyan-500/50 bg-cyan-500/10 text-cyan-300 px-3.5 py-1.5 font-bold hover:bg-cyan-500/20 flex items-center gap-1 transition-all"
+          >
+            <span>📺 Layar TV Scoreboard</span>
+            <span>↗</span>
+          </Link>
         </div>
       </div>
 
