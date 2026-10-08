@@ -5,12 +5,13 @@
 -- Siap diimpor langsung via phpMyAdmin di Hostinger atau MySQL lokal (XAMPP).
 -- ==============================================================================
 
--- Buat database jika belum ada (sesuaikan nama database di Hostinger)
-CREATE DATABASE IF NOT EXISTS `annur_minsoc` 
-  DEFAULT CHARACTER SET utf8mb4 
-  COLLATE utf8mb4_unicode_ci;
-
-USE `annur_minsoc`;
+-- CATATAN UNTUK HOSTINGER / CPANEL:
+-- Database dibuat terlebih dahulu melalui menu "MySQL Databases" di hPanel / cPanel.
+-- Pilih database Anda di phpMyAdmin, lalu import skema ini (tabel akan langsung dibuat di database yang aktif).
+--
+-- Untuk instalasi lokal (opsional):
+-- CREATE DATABASE IF NOT EXISTS `annur_minsoc` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE `annur_minsoc`;
 
 -- ------------------------------------------------------------------------------
 -- 1. TABEL TEAMS (Daftar Tim Turnamen)
