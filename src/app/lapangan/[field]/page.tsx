@@ -14,6 +14,7 @@ import Monogram from '@/components/Monogram';
 import StatusBadge from '@/components/StatusBadge';
 import MatchEventsManager from '@/components/MatchEventsManager';
 import MatchPamphletModal from '@/components/MatchPamphletModal';
+import { toast } from '@/components/Toast';
 
 export default function PetugasLapanganPage() {
   const params = useParams<{ field: string }>();
@@ -144,7 +145,9 @@ export default function PetugasLapanganPage() {
       setLastSaved(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
       await matchesStore.refresh();
       announceChangeEverywhere();
+      toast.success('Skor Lapangan berhasil diperbarui!');
     } catch {
+      toast.error('Gagal memperbarui skor. Periksa koneksi internet.');
       reload();
     } finally {
       setSaving(false);
@@ -167,6 +170,11 @@ export default function PetugasLapanganPage() {
         `Akhiri ${selected.team_a?.name ?? 'Tim A'} ${selected.score_a}–${selected.score_b} ${selected.team_b?.name ?? 'Tim B'}? Skor akhir dikunci di klasemen.`
       );
       if (!ok) return;
+      toast.info('Pertandingan dinyatakan Selesai (Full Time).');
+    } else if (status === 'live') {
+      toast.info('Pertandingan dimulai (Babak Berjalan).');
+    } else if (status === 'halftime') {
+      toast.info('Waktu Istirahat Babak Pertama (Halftime).');
     }
     triggerHaptic();
     update(selected.id, { status });
@@ -198,8 +206,16 @@ export default function PetugasLapanganPage() {
       {/* HEADER KHUSUS PENJAGA LAPANGAN (Mobile Optimized) */}
       <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur-md">
         <div className="wrap flex h-14 items-center justify-between gap-1.5 sm:gap-3">
-          {/* Identitas Lapangan & Jam WIB */}
+          {/* Identitas Lapangan & Logo Utama Turnamen */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link href="/" className="flex items-center gap-1.5 shrink-0" title="Beranda Turnamen">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logoutama.png"
+                alt="Logo An-Nur"
+                className="h-7 w-auto object-contain flex-none"
+              />
+            </Link>
             <span
               className={`rounded-full px-2.5 sm:px-3 py-1 font-display text-[11px] sm:text-xs font-black tracking-wider uppercase text-ink shadow-sm ${
                 isField1 ? 'bg-blue' : 'bg-emerald-500'

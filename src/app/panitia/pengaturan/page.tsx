@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { EventSettings, Sponsor, SponsorFormData, SponsorTier } from '@/lib/types';
 import { announceChangeEverywhere } from '@/lib/live-store';
+import { toast } from '@/components/Toast';
 
 const DEFAULT_SPONSOR_FORM: SponsorFormData = {
   name: '',
@@ -107,6 +108,7 @@ export default function PengaturanPage() {
     const newCode = editPasscode[key].trim().toUpperCase();
     if (!newCode || newCode.length < 4) {
       setMessage({ type: 'error', text: 'Kode sandi minimal 4 karakter.' });
+      toast.error('Kode sandi minimal 4 karakter!');
       return;
     }
     setSavingPasscode(target);
@@ -118,14 +120,19 @@ export default function PengaturanPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
-        setMessage({ type: 'success', text: data.message || 'Kode sandi berhasil diperbarui!' });
+        const msg = data.message || 'Kode sandi berhasil diperbarui!';
+        setMessage({ type: 'success', text: msg });
+        toast.success(msg);
         await fetchSecurityData();
         setTimeout(() => setMessage(null), 3500);
       } else {
-        setMessage({ type: 'error', text: data.error || 'Gagal memperbarui kode sandi.' });
+        const err = data.error || 'Gagal memperbarui kode sandi.';
+        setMessage({ type: 'error', text: err });
+        toast.error(err);
       }
     } catch {
       setMessage({ type: 'error', text: 'Gagal terhubung ke server.' });
+      toast.error('Gagal terhubung ke server.');
     } finally {
       setSavingPasscode(null);
     }
@@ -135,6 +142,7 @@ export default function PengaturanPage() {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(text);
       setCopiedKey(label);
+      toast.success(`Tautan WhatsApp ${label} berhasil disalin!`);
       setTimeout(() => setCopiedKey(null), 2500);
     }
   };
@@ -212,18 +220,23 @@ export default function PengaturanPage() {
         if (data.data) setSettings(data.data);
         announceChangeEverywhere();
         setMessage({ type: 'success', text: 'Pengaturan turnamen berhasil disimpan!' });
+        toast.success('Pengaturan turnamen berhasil disimpan!');
         setTimeout(() => setMessage(null), 3500);
       } else {
+        const err = data.error || 'Gagal menyimpan pengaturan.';
         setMessage({
           type: 'error',
-          text: data.error || 'Gagal menyimpan pengaturan.',
+          text: err,
         });
+        toast.error(err);
       }
     } catch {
+      const err = 'Tidak dapat menghubungi server. Periksa koneksi lalu coba lagi.';
       setMessage({
         type: 'error',
-        text: 'Tidak dapat menghubungi server. Periksa koneksi lalu coba lagi.',
+        text: err,
       });
+      toast.error(err);
     } finally {
       setIsSaving(false);
     }
@@ -232,6 +245,7 @@ export default function PengaturanPage() {
   const handleReset = async () => {
     if (resetCode !== 'RESET') {
       setMessage({ type: 'error', text: "Ketik 'RESET' untuk mengonfirmasi" });
+      toast.warning("Ketik 'RESET' untuk mengonfirmasi");
       return;
     }
 
@@ -241,15 +255,18 @@ export default function PengaturanPage() {
       if (res.ok) {
         announceChangeEverywhere();
         setMessage({ type: 'success', text: 'Semua data turnamen berhasil direset!' });
+        toast.success('Semua data turnamen berhasil direset!');
         setTimeout(() => {
           setMessage(null);
           window.location.reload();
         }, 1500);
       } else {
         setMessage({ type: 'error', text: 'Gagal mereset data turnamen.' });
+        toast.error('Gagal mereset data turnamen.');
       }
     } catch {
       setMessage({ type: 'error', text: 'Terjadi kesalahan saat mereset data.' });
+      toast.error('Terjadi kesalahan saat mereset data.');
     } finally {
       setIsResetting(false);
       setShowResetConfirm(false);
@@ -358,22 +375,28 @@ export default function PengaturanPage() {
         await fetchSponsors();
         announceChangeEverywhere();
         closeSponsorModal();
+        const successMsg = isEdit ? 'Sponsor berhasil diperbarui!' : 'Sponsor baru berhasil ditambahkan!';
         setMessage({
           type: 'success',
-          text: isEdit ? 'Sponsor berhasil diperbarui!' : 'Sponsor baru berhasil ditambahkan!',
+          text: successMsg,
         });
+        toast.success(successMsg);
         setTimeout(() => setMessage(null), 3500);
       } else {
+        const err = data.error || 'Gagal menyimpan sponsor.';
         setSponsorActionMessage({
           type: 'error',
-          text: data.error || 'Gagal menyimpan sponsor.',
+          text: err,
         });
+        toast.error(err);
       }
     } catch {
+      const err = 'Tidak dapat menghubungi server. Periksa koneksi internet Anda.';
       setSponsorActionMessage({
         type: 'error',
-        text: 'Tidak dapat menghubungi server. Periksa koneksi internet Anda.',
+        text: err,
       });
+      toast.error(err);
     } finally {
       setIsSavingSponsor(false);
     }
@@ -395,14 +418,17 @@ export default function PengaturanPage() {
 
       if (res.ok) {
         announceChangeEverywhere();
+        toast.success(nextActive ? `Sponsor "${sponsor.name}" diaktifkan.` : `Sponsor "${sponsor.name}" dinonaktifkan.`);
       } else {
         // Rollback if failed
         await fetchSponsors();
         setMessage({ type: 'error', text: 'Gagal mengubah status sponsor.' });
+        toast.error('Gagal mengubah status sponsor.');
       }
     } catch {
       await fetchSponsors();
       setMessage({ type: 'error', text: 'Koneksi gagal saat mengubah status sponsor.' });
+      toast.error('Koneksi gagal saat mengubah status sponsor.');
     }
   };
 
@@ -415,13 +441,17 @@ export default function PengaturanPage() {
       if (res.ok) {
         setSponsors((prev) => prev.filter((s) => s.id !== sponsor.id));
         announceChangeEverywhere();
-        setMessage({ type: 'success', text: `Sponsor "${sponsor.name}" berhasil dihapus.` });
+        const msg = `Sponsor "${sponsor.name}" berhasil dihapus.`;
+        setMessage({ type: 'success', text: msg });
+        toast.success(msg);
         setTimeout(() => setMessage(null), 3500);
       } else {
         setMessage({ type: 'error', text: 'Gagal menghapus sponsor.' });
+        toast.error('Gagal menghapus sponsor.');
       }
     } catch {
       setMessage({ type: 'error', text: 'Koneksi gagal saat menghapus sponsor.' });
+      toast.error('Koneksi gagal saat menghapus sponsor.');
     }
   };
 

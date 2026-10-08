@@ -13,6 +13,7 @@ import CategoryMark from '@/components/CategoryMark';
 import StatusBadge from '@/components/StatusBadge';
 import KnockoutBracket from '@/components/KnockoutBracket';
 import Monogram from '@/components/Monogram';
+import { toast } from '@/components/Toast';
 
 export default function JadwalPanitia() {
   // Sebelumnya halaman ini hanya memuat SEKALI saat dibuka. Kalau committee
@@ -70,7 +71,9 @@ export default function JadwalPanitia() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.team_a_id === formData.team_b_id) {
-      setMessage({ type: 'error', text: 'Tim A dan Tim B tidak boleh sama.' });
+      const err = 'Tim A dan Tim B tidak boleh sama.';
+      setMessage({ type: 'error', text: err });
+      toast.error(err);
       return;
     }
     try {
@@ -84,16 +87,21 @@ export default function JadwalPanitia() {
         closeForm();
         void matchesStore.refresh();
         announceChangeEverywhere();
+        const successMsg = editingId ? 'Jadwal berhasil diperbarui.' : 'Jadwal berhasil ditambahkan.';
         setMessage({
           type: 'success',
-          text: editingId ? 'Jadwal berhasil diperbarui.' : 'Jadwal berhasil ditambahkan.',
+          text: successMsg,
         });
+        toast.success(successMsg);
       } else {
         const err = await res.json().catch(() => ({}));
-        setMessage({ type: 'error', text: err.error || 'Gagal menyimpan jadwal.' });
+        const errMsg = err.error || 'Gagal menyimpan jadwal.';
+        setMessage({ type: 'error', text: errMsg });
+        toast.error(errMsg);
       }
     } catch {
       setMessage({ type: 'error', text: 'Kesalahan jaringan, coba lagi.' });
+      toast.error('Kesalahan jaringan, coba lagi.');
     }
   };
 
@@ -107,12 +115,16 @@ export default function JadwalPanitia() {
         void matchesStore.refresh();
         announceChangeEverywhere();
         setMessage({ type: 'success', text: 'Pertandingan berhasil dihapus.' });
+        toast.success('Pertandingan berhasil dihapus.');
       } else {
         const err = await res.json().catch(() => ({}));
-        setMessage({ type: 'error', text: err.error || 'Gagal menghapus pertandingan.' });
+        const errMsg = err.error || 'Gagal menghapus pertandingan.';
+        setMessage({ type: 'error', text: errMsg });
+        toast.error(errMsg);
       }
     } catch {
       setMessage({ type: 'error', text: 'Kesalahan jaringan saat menghapus.' });
+      toast.error('Kesalahan jaringan saat menghapus.');
     } finally {
       setIsDeleting(false);
     }
@@ -130,22 +142,28 @@ export default function JadwalPanitia() {
       if (res.ok) {
         void matchesStore.refresh();
         announceChangeEverywhere();
+        const successMsg = `⚡ Bagan ${cat} berhasil disinkronkan! ${data.message || ''}`;
         setMessage({
           type: 'success',
-          text: `⚡ Bagan ${cat} berhasil disinkronkan! ${data.message || ''}`,
+          text: successMsg,
         });
+        toast.success(successMsg);
         setSyncModalOpen(false);
       } else {
+        const errMsg = data.error || 'Gagal menyinkronkan bagan babak gugur.';
         setMessage({
           type: 'error',
-          text: data.error || 'Gagal menyinkronkan bagan babak gugur.',
+          text: errMsg,
         });
+        toast.error(errMsg);
       }
     } catch {
+      const errMsg = 'Kesalahan jaringan saat sinkronisasi bagan.';
       setMessage({
         type: 'error',
-        text: 'Kesalahan jaringan saat sinkronisasi bagan.',
+        text: errMsg,
       });
+      toast.error(errMsg);
     } finally {
       setIsSyncing(false);
     }

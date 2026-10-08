@@ -5,6 +5,7 @@ import type { Team, TeamFormData } from '@/lib/types';
 import Monogram from '@/components/Monogram';
 import CategoryMark from '@/components/CategoryMark';
 import { announceChangeEverywhere, teamsStore, useResource } from '@/lib/live-store';
+import { toast } from '@/components/Toast';
 
 const EMPTY: TeamFormData = {
   name: '',
@@ -31,7 +32,9 @@ export default function TimPanitia() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.short_name.trim().length !== 3) {
-      setMessage({ type: 'error', text: 'Singkatan tim harus tepat 3 huruf.' });
+      const err = 'Singkatan tim harus tepat 3 huruf.';
+      setMessage({ type: 'error', text: err });
+      toast.error(err);
       return;
     }
     try {
@@ -45,16 +48,21 @@ export default function TimPanitia() {
         closeForm();
         void teamsStore.refresh();
         announceChangeEverywhere();
+        const successMsg = editingId ? 'Tim berhasil diperbarui.' : 'Tim berhasil ditambahkan.';
         setMessage({
           type: 'success',
-          text: editingId ? 'Tim berhasil diperbarui.' : 'Tim berhasil ditambahkan.',
+          text: successMsg,
         });
+        toast.success(successMsg);
       } else {
         const err = await res.json().catch(() => ({}));
-        setMessage({ type: 'error', text: err.error || 'Terjadi kesalahan.' });
+        const errMsg = err.error || 'Terjadi kesalahan.';
+        setMessage({ type: 'error', text: errMsg });
+        toast.error(errMsg);
       }
     } catch {
       setMessage({ type: 'error', text: 'Kesalahan jaringan.' });
+      toast.error('Kesalahan jaringan.');
     }
   };
 
@@ -68,12 +76,16 @@ export default function TimPanitia() {
         void teamsStore.refresh();
         announceChangeEverywhere();
         setMessage({ type: 'success', text: 'Tim berhasil dihapus.' });
+        toast.success('Tim berhasil dihapus.');
       } else {
         const err = await res.json().catch(() => ({}));
-        setMessage({ type: 'error', text: err.error || 'Gagal menghapus tim.' });
+        const errMsg = err.error || 'Gagal menghapus tim.';
+        setMessage({ type: 'error', text: errMsg });
+        toast.error(errMsg);
       }
     } catch {
       setMessage({ type: 'error', text: 'Kesalahan jaringan saat menghapus tim.' });
+      toast.error('Kesalahan jaringan saat menghapus tim.');
     } finally {
       setIsDeleting(false);
     }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from '@/components/Toast';
 
 interface AdminUserRow {
   id: string;
@@ -51,14 +52,19 @@ export default function PenggunaPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage({ type: 'error', text: data.error || 'Gagal membuat pengguna.' });
+        const errMsg = data.error || 'Gagal membuat pengguna.';
+        setMessage({ type: 'error', text: errMsg });
+        toast.error(errMsg);
         return;
       }
-      setMessage({ type: 'success', text: `Pengguna "${form.username}" dibuat.` });
+      const successMsg = `Pengguna "${form.username}" dibuat.`;
+      setMessage({ type: 'success', text: successMsg });
+      toast.success(successMsg);
       setForm({ username: '', password: '', role: 'admin' });
       await load();
     } catch {
       setMessage({ type: 'error', text: 'Tidak dapat terhubung ke server.' });
+      toast.error('Tidak dapat terhubung ke server.');
     } finally {
       setCreating(false);
     }
@@ -74,12 +80,16 @@ export default function PenggunaPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage({ type: 'error', text: data.error || 'Gagal memperbarui.' });
+        const errMsg = data.error || 'Gagal memperbarui.';
+        setMessage({ type: 'error', text: errMsg });
+        toast.error(errMsg);
         return;
       }
+      toast.success('Status pengguna berhasil diperbarui!');
       await load();
     } catch {
       setMessage({ type: 'error', text: 'Tidak dapat terhubung ke server.' });
+      toast.error('Tidak dapat terhubung ke server.');
     }
   };
 
@@ -90,12 +100,16 @@ export default function PenggunaPage() {
       const res = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage({ type: 'error', text: data.error || 'Gagal menghapus.' });
+        const errMsg = data.error || 'Gagal menghapus.';
+        setMessage({ type: 'error', text: errMsg });
+        toast.error(errMsg);
         return;
       }
+      toast.success(`Pengguna "${username ?? id}" berhasil dihapus.`);
       await load();
     } catch {
       setMessage({ type: 'error', text: 'Tidak dapat terhubung ke server.' });
+      toast.error('Tidak dapat terhubung ke server.');
     }
   };
 

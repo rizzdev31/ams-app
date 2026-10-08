@@ -13,6 +13,7 @@ import CategoryMark from '@/components/CategoryMark';
 import StatusBadge from '@/components/StatusBadge';
 import MatchEventsManager from '@/components/MatchEventsManager';
 import Monogram from '@/components/Monogram';
+import { toast } from '@/components/Toast';
 
 const FIELDS = ['1', '2'];
 
@@ -95,12 +96,26 @@ export default function SkorTab() {
       if (!res.ok) throw new Error();
       setSaveState({ kind: 'saved', time: stamp(new Date()) });
       if (undoable) showUndo(undoable);
+      
+      if (body.status) {
+        const statusLabels: Record<string, string> = {
+          scheduled: 'Jadwal',
+          live: 'Babak 1 (Live)',
+          halftime: 'Turun Minum (Halftime)',
+          finished: 'Selesai (Finished)',
+        };
+        toast.info(`Status pertandingan diubah: ${statusLabels[body.status as string] || body.status}`);
+      } else if (body.score_a !== undefined || body.score_b !== undefined) {
+        toast.success(`Skor pertandingan diperbarui: ${body.score_a ?? ''} - ${body.score_b ?? ''}`);
+      }
+
       // Segarkan store lokal lalu beritahukan SEMUA tab (publik dan panitia
       // lain) supaya angka berubah seketika, bukan setelah giliran polling.
       await matchesStore.refresh();
       announceChangeEverywhere();
     } catch {
       setSaveState({ kind: 'error', time: '' });
+      toast.error('Gagal memperbarui data pertandingan ke server!');
       reload();
     }
   };
@@ -145,6 +160,7 @@ export default function SkorTab() {
     if (!undo) return;
     const { matchId, snapshot } = undo;
     setUndo(null);
+    toast.info('Membatalkan perubahan skor (Undo)...');
     await push(matchId, snapshot);
   };
 

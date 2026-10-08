@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { MatchEvent, MatchEventType, MatchWithTeams, Player } from '@/lib/types';
 import { announceChangeEverywhere, matchesStore } from '@/lib/live-store';
+import { toast } from '@/components/Toast';
 
 interface MatchEventsManagerProps {
   match: MatchWithTeams;
@@ -93,7 +94,9 @@ export default function MatchEventsManager({ match, onMatchUpdated }: MatchEvent
     }
 
     if (!finalPlayerName) {
-      setMsg({ kind: 'error', text: 'Nama pemain wajib diisi atau dipilih dari roster.' });
+      const errMsg = 'Nama pemain wajib diisi atau dipilih dari roster.';
+      setMsg({ kind: 'error', text: errMsg });
+      toast.error(errMsg);
       return;
     }
 
@@ -120,10 +123,12 @@ export default function MatchEventsManager({ match, onMatchUpdated }: MatchEvent
         throw new Error(json.error || 'Gagal menyimpan kejadian.');
       }
 
+      const successMsg = `${mode === 'goal' ? '⚽ Gol' : mode === 'yellow_card' ? '🟨 Kartu Kuning' : '🟥 Kartu Merah'} berhasil dicatat!`;
       setMsg({
         kind: 'success',
-        text: `${mode === 'goal' ? '⚽ Gol' : mode === 'yellow_card' ? '🟨 Kartu Kuning' : '🟥 Kartu Merah'} berhasil dicatat!`,
+        text: successMsg,
       });
+      toast.success(successMsg);
 
       setMode(null);
       await loadEvents();
@@ -134,7 +139,9 @@ export default function MatchEventsManager({ match, onMatchUpdated }: MatchEvent
         if (onMatchUpdated) onMatchUpdated();
       }
     } catch (err: unknown) {
-      setMsg({ kind: 'error', text: (err as Error).message || 'Terjadi kesalahan.' });
+      const errMsg = (err as Error).message || 'Terjadi kesalahan.';
+      setMsg({ kind: 'error', text: errMsg });
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -162,6 +169,7 @@ export default function MatchEventsManager({ match, onMatchUpdated }: MatchEvent
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Gagal menghapus');
 
+      toast.success('Catatan kejadian pertandingan berhasil dihapus.');
       await loadEvents();
       if (decrement) {
         await matchesStore.refresh();
@@ -169,7 +177,8 @@ export default function MatchEventsManager({ match, onMatchUpdated }: MatchEvent
         if (onMatchUpdated) onMatchUpdated();
       }
     } catch (err: unknown) {
-      alert((err as Error).message || 'Gagal menghapus kejadian.');
+      const errMsg = (err as Error).message || 'Gagal menghapus kejadian.';
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }

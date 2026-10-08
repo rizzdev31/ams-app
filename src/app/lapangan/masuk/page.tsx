@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/components/Toast';
 
 function LapanganLoginForm() {
   const router = useRouter();
@@ -27,7 +28,9 @@ function LapanganLoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passcode.trim()) {
-      setError('Masukkan kode akses lapangan.');
+      const msg = 'Masukkan kode akses lapangan.';
+      setError(msg);
+      toast.warning(msg);
       return;
     }
 
@@ -46,10 +49,13 @@ function LapanganLoginForm() {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setError(json.error || 'Kode akses tidak cocok. Hubungi panitia turnamen.');
+        const errMsg = json.error || 'Kode akses tidak cocok. Hubungi panitia turnamen.';
+        setError(errMsg);
+        toast.error(errMsg);
         return;
       }
 
+      toast.success('Kode akses terverifikasi! Masuk ke konsol...');
       // Sukses! Redirect ke lapangan tujuan
       const destination =
         fromPath && fromPath.startsWith('/lapangan')
@@ -61,7 +67,9 @@ function LapanganLoginForm() {
       router.push(destination);
       router.refresh();
     } catch {
-      setError('Gagal menghubungkan ke server keamanan. Periksa koneksi internet.');
+      const connErr = 'Gagal menghubungkan ke server keamanan. Periksa koneksi internet.';
+      setError(connErr);
+      toast.error(connErr);
     } finally {
       setLoading(false);
     }
@@ -89,8 +97,13 @@ function LapanganLoginForm() {
         <div className="rounded-[28px] border-2 border-slate-800 bg-slate-900/90 backdrop-blur-xl p-6 sm:p-8 shadow-2xl space-y-6">
           {/* Logo & Badge Header */}
           <div className="text-center space-y-2">
-            <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-blue-600/20 to-emerald-500/20 border border-slate-700 shadow-inner">
-              <span className="text-3xl">🛡️</span>
+            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-gradient-to-br from-blue-600/20 to-emerald-500/20 border border-slate-700 shadow-inner">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logoutama.png"
+                alt="Logo An-Nur"
+                className="h-12 w-auto object-contain filter drop-shadow"
+              />
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight">
               Konsol Petugas Lapangan

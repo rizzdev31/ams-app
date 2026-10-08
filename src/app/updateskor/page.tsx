@@ -8,6 +8,7 @@ import EmptyState from '@/components/EmptyState';
 import MatchEventsManager from '@/components/MatchEventsManager';
 import MatchPamphletModal from '@/components/MatchPamphletModal';
 import { announceChangeEverywhere, matchesStore, useResource } from '@/lib/live-store';
+import { toast } from '@/components/Toast';
 
 /** Papan skor lapangan: satu layar untuk wasit di dua lapangan. */
 export default function UpdateSkorPage() {
@@ -66,7 +67,9 @@ export default function UpdateSkorPage() {
       // Segarkan store lokal lalu siarkan ke semua tab terbuka.
       await matchesStore.refresh();
       announceChangeEverywhere();
+      toast.success('Papan skor berhasil diperbarui!');
     } catch {
+      toast.error('Gagal memperbarui skor.');
       reload();
     } finally {
       setSaving(null);
@@ -86,6 +89,11 @@ export default function UpdateSkorPage() {
         `Akhiri ${m.team_a?.name ?? 'Tim A'} ${m.score_a}–${m.score_b} ${m.team_b?.name ?? 'Tim B'}? Skor akhir dikunci di klasemen.`
       );
       if (!ok) return;
+      toast.info('Pertandingan dinyatakan Selesai (Full Time).');
+    } else if (status === 'live') {
+      toast.info('Pertandingan dimulai.');
+    } else if (status === 'halftime') {
+      toast.info('Waktu Istirahat (Halftime).');
     }
     update(m, { status });
   };
@@ -94,10 +102,18 @@ export default function UpdateSkorPage() {
     <div className="min-h-screen bg-ink pb-12">
       <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur-md">
         <div className="wrap flex h-14 items-center justify-between gap-3">
-          <span className="font-display text-[17px] font-extrabold flex items-center gap-2">
-            <span>⏱️</span>
-            <span>Papan Wasit & Skor</span>
-          </span>
+          <Link href="/" title="Beranda Turnamen" className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logoutama.png"
+              alt="Logo An-Nur"
+              className="h-7 w-auto object-contain flex-none"
+            />
+            <span className="font-display text-[16px] sm:text-[17px] font-extrabold flex items-center gap-1.5">
+              <span>⏱️</span>
+              <span>Papan Wasit & Skor</span>
+            </span>
+          </Link>
           <div className="flex items-center gap-2">
             <span className="label text-muted text-xs" aria-live="polite">
               {saving ? 'Menyimpan…' : lastUpdated ? `Diperbarui ${lastUpdated}` : 'Memuat…'}

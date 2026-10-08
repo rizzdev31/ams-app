@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { toPng, toBlob } from 'html-to-image';
 import type { MatchWithTeams, MatchEvent, Sponsor } from '@/lib/types';
 import MatchPamphlet from './MatchPamphlet';
+import { toast } from '@/components/Toast';
 
 interface MatchPamphletModalProps {
   match: MatchWithTeams | null;
@@ -119,6 +120,7 @@ export default function MatchPamphletModal({
   const handleDownload = async () => {
     if (!pamphletRef.current) return;
     setIsGenerating(true);
+    toast.info('Menyiapkan pamflet HD 1080x1350...');
     try {
       if (document.fonts) await document.fonts.ready;
 
@@ -130,9 +132,11 @@ export default function MatchPamphletModal({
       link.click();
 
       showToast('✅ Pamflet 1080x1350 berhasil diunduh ke galeri/komputer!');
+      toast.success('Pamflet 1080x1350 berhasil diunduh!');
     } catch (err) {
       console.error('Gagal generate pamflet PNG:', err);
       showToast('❌ Gagal mengunduh pamflet. Silakan coba lagi.');
+      toast.error('Gagal mengunduh pamflet.');
     } finally {
       setIsGenerating(false);
     }
@@ -142,6 +146,7 @@ export default function MatchPamphletModal({
   const handleCopy = async () => {
     if (!pamphletRef.current) return;
     setIsGenerating(true);
+    toast.info('Menyalin pamflet ke clipboard...');
     try {
       if (document.fonts) await document.fonts.ready;
 
@@ -154,12 +159,14 @@ export default function MatchPamphletModal({
           new ClipboardItem({ 'image/png': blob }),
         ]);
         showToast('📋 Gambar 1080x1350 disalin! Tempel (Ctrl+V) langsung di WhatsApp.');
+        toast.success('Pamflet disalin! Tempel (Ctrl+V) di WhatsApp.');
       } else {
         handleDownload();
       }
     } catch (err) {
       console.error('Gagal copy image:', err);
       showToast('⚠️ Salin langsung tidak didukung browser, mengunduh file...');
+      toast.warning('Browser tidak mendukung salin langsung, mengunduh...');
       handleDownload();
     } finally {
       setIsGenerating(false);
@@ -170,6 +177,7 @@ export default function MatchPamphletModal({
   const handleShare = async () => {
     if (!pamphletRef.current) return;
     setIsGenerating(true);
+    toast.info('Membuka menu bagikan...');
     try {
       if (document.fonts) await document.fonts.ready;
 
@@ -187,12 +195,14 @@ export default function MatchPamphletModal({
           text: `Hasil Laga ${match?.category || 'U10'}: ${match?.team_a?.name} (${match?.score_a}) vs (${match?.score_b}) ${match?.team_b?.name}. Simak laporan resmi turnamen!`,
         });
         showToast('✅ Berhasil dibagikan!');
+        toast.success('Pamflet berhasil dibagikan!');
       } else {
         handleDownload();
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         console.error('Gagal membagikan pamflet:', err);
+        toast.error('Gagal membagikan pamflet.');
         handleDownload();
       }
     } finally {

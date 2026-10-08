@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ApiResponse, Player, Team } from '@/lib/types';
 import { positionLabel } from '@/lib/utils';
+import { toast } from '@/components/Toast';
 
 const POSITIONS = ['GK', 'DF', 'MF', 'FW'];
 
@@ -69,6 +70,7 @@ export default function PemainPanitia() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    const isEdit = Boolean(editing);
     try {
       const res = await fetch(editing ? `/api/players/${editing.id}` : '/api/players', {
         method: editing ? 'PUT' : 'POST',
@@ -82,13 +84,17 @@ export default function PemainPanitia() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMessage(data.error || 'Gagal menyimpan pemain.');
+        const errMsg = data.error || 'Gagal menyimpan pemain.';
+        setMessage(errMsg);
+        toast.error(errMsg);
         return;
       }
       resetForm();
       loadPlayers(teamId);
+      toast.success(isEdit ? 'Data pemain berhasil diperbarui!' : 'Pemain baru berhasil ditambahkan!');
     } catch {
       setMessage('Kesalahan jaringan.');
+      toast.error('Kesalahan jaringan.');
     }
   };
 
@@ -98,12 +104,16 @@ export default function PemainPanitia() {
       const res = await fetch(`/api/players/${p.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setMessage(data.error || 'Gagal menghapus pemain.');
+        const errMsg = data.error || 'Gagal menghapus pemain.';
+        setMessage(errMsg);
+        toast.error(errMsg);
         return;
       }
       loadPlayers(teamId);
+      toast.success(`Pemain ${p.name} berhasil dihapus.`);
     } catch {
       setMessage('Kesalahan jaringan.');
+      toast.error('Kesalahan jaringan.');
     }
   };
 

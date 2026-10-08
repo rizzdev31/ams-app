@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/components/Toast';
 
 export default function LoginForm() {
   const [username, setUsername] = useState('');
@@ -25,15 +26,20 @@ export default function LoginForm() {
       });
 
       if (res.ok) {
+        toast.success('Berhasil masuk ke Portal Panitia!');
         const dest = from && from.startsWith('/') && !from.startsWith('//') ? from : '/panitia';
         window.location.href = dest;
         return;
       }
 
       const data = await res.json().catch(() => ({}));
-      setError(data?.error || 'Nama pengguna atau kata sandi salah.');
+      const errMsg = data?.error || 'Nama pengguna atau kata sandi salah.';
+      setError(errMsg);
+      toast.error(errMsg);
     } catch {
-      setError('Tidak dapat menghubungi server. Coba lagi.');
+      const connErr = 'Tidak dapat menghubungi server. Coba lagi.';
+      setError(connErr);
+      toast.error(connErr);
     } finally {
       setIsLoading(false);
     }
@@ -44,8 +50,18 @@ export default function LoginForm() {
 
   return (
     <div className="w-full max-w-[360px]">
-      <p className="label text-blue">Masuk Panitia</p>
-      <h1 className="mt-2 font-display text-4xl font-extrabold">An-Nur</h1>
+      <div className="flex items-center gap-3 mb-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logoutama.png"
+          alt="Logo An-Nur"
+          className="h-12 w-auto object-contain flex-none filter drop-shadow"
+        />
+        <div>
+          <p className="label text-blue text-xs uppercase tracking-wider font-mono">Portal Panitia</p>
+          <h1 className="font-display text-2xl font-extrabold leading-tight">An-Nur 2026</h1>
+        </div>
+      </div>
 
       <form onSubmit={handleLogin} className="mt-7">
         <label htmlFor="username" className="label mb-1.5 block text-muted">

@@ -3,6 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/components/Toast';
 
 function UpdateSkorLoginForm() {
   const router = useRouter();
@@ -13,7 +14,9 @@ function UpdateSkorLoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passcode.trim()) {
-      setError('Masukkan kode akses update skor.');
+      const msg = 'Masukkan kode akses update skor.';
+      setError(msg);
+      toast.warning(msg);
       return;
     }
 
@@ -32,14 +35,19 @@ function UpdateSkorLoginForm() {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setError(json.error || 'Kode akses tidak cocok. Hubungi panitia turnamen.');
+        const errMsg = json.error || 'Kode akses tidak cocok. Hubungi panitia turnamen.';
+        setError(errMsg);
+        toast.error(errMsg);
         return;
       }
 
+      toast.success('Kode wasit terverifikasi! Masuk ke papan skor...');
       router.push('/updateskor');
       router.refresh();
     } catch {
-      setError('Gagal menghubungkan ke server keamanan. Periksa koneksi internet.');
+      const connErr = 'Gagal menghubungkan ke server keamanan. Periksa koneksi internet.';
+      setError(connErr);
+      toast.error(connErr);
     } finally {
       setLoading(false);
     }
@@ -67,8 +75,13 @@ function UpdateSkorLoginForm() {
         <div className="rounded-[28px] border-2 border-slate-800 bg-slate-900/90 backdrop-blur-xl p-6 sm:p-8 shadow-2xl space-y-6">
           {/* Logo & Header */}
           <div className="text-center space-y-2">
-            <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-amber-500/20 to-rose-500/20 border border-slate-700 shadow-inner">
-              <span className="text-3xl">⏱️</span>
+            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-gradient-to-br from-amber-500/20 to-rose-500/20 border border-slate-700 shadow-inner">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logoutama.png"
+                alt="Logo An-Nur"
+                className="h-12 w-auto object-contain filter drop-shadow"
+              />
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight">
               Papan Update Skor Panitia
