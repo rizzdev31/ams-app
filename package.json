@@ -4,12 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint src scripts",
     "typecheck": "tsc --noEmit",
     "seed:refresh": "npx tsx scripts/refresh-seed.ts",
-    "bundle:hostinger": "next build && node scripts/prepare-hostinger.js",
+    "bundle:hostinger": "next build --webpack && node scripts/prepare-hostinger.js",
     "test": "vitest run"
   },
   "dependencies": {
