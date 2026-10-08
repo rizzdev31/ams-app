@@ -21,18 +21,31 @@ describe('sinkronisasi antar halaman', () => {
     const matches = withTeams(SEED_MATCHES);
     const teams = SEED_TEAMS;
 
-    // Beranda/Baris cocok dengan klasemen untuk pertandingan yang sama.
-    const finished = matches.filter((m) => m.status === 'finished');
+    // Jika turnamen belum mulai, simulasikan 1 pertandingan finished untuk verifikasi sinkronisasi
+    const hasFinished = matches.some((m) => m.status === 'finished');
+    const testMatches = hasFinished
+      ? matches
+      : [
+          ...matches.slice(1),
+          {
+            ...matches[0],
+            status: 'finished' as const,
+            score_a: 2,
+            score_b: 1,
+          },
+        ];
+
+    const finished = testMatches.filter((m) => m.status === 'finished');
     expect(finished.length).toBeGreaterThan(0);
 
     for (const m of finished) {
-      const rows = calculateStandings(teams, matches, 'A');
+      const rows = calculateStandings(teams, testMatches, m.group_name || 'A');
       const rowA = rows.find((r) => r.team.id === m.team_a_id)!;
       const rowB = rows.find((r) => r.team.id === m.team_b_id)!;
 
-      // Poin harus naik sesuai hasil: menang 3, seri 1, kalah 0.
-      const expectedA = m.score_a > m.score_b ? 3 : m.score_a === m.score_b ? 1 : 0;
-      const expectedB = m.score_b > m.score_a ? 3 : m.score_a === m.score_b ? 1 : 0;
+      // Poin harus naik sesuai hasil: menang 2, seri 1, kalah 0.
+      const expectedA = m.score_a > m.score_b ? 2 : m.score_a === m.score_b ? 1 : 0;
+      const expectedB = m.score_b > m.score_a ? 2 : m.score_a === m.score_b ? 1 : 0;
       if (m.score_a === m.score_b) {
         expect(rowA.points).toBeGreaterThanOrEqual(1);
         expect(rowB.points).toBeGreaterThanOrEqual(1);

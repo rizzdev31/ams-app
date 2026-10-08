@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
-  supabase,
-  getServiceSupabase,
-  isSupabaseConfigured,
-  isServiceRoleConfigured,
-  SUPABASE_MISCONFIGURED_MESSAGE,
-  SUPABASE_MISSING_SERVICE_KEY_MESSAGE,
-} from '@/lib/supabase';
+  dbMatches,
+  dbTeams,
+  isDatabaseConfigured,
+  isDatabaseWritable,
+  DB_MISCONFIGURED_MESSAGE,
+  DB_READONLY_MESSAGE,
+} from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { audit } from '@/lib/admin-users';
 import { parseJsonBody } from '@/lib/http';
@@ -18,13 +18,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
 const STATUSES = ['scheduled', 'live', 'halftime', 'finished'] as const;
-const STAGES = ['grup', 'semifinal', 'final'] as const;
+const STAGES = ['grup', 'perempat_final', 'semifinal', 'juara_3', 'final'] as const;
 
 export async function GET(request: Request) {
-  if (!isSupabaseConfigured()) {
-    console.warn(SUPABASE_MISCONFIGURED_MESSAGE);
+  if (!isDatabaseConfigured()) {
+    console.warn(DB_MISCONFIGURED_MESSAGE);
     return NextResponse.json(
-      { success: false, data: [], error: SUPABASE_MISCONFIGURED_MESSAGE },
+      { success: false, data: [], error: DB_MISCONFIGURED_MESSAGE },
       { status: 503 }
     );
   }
@@ -35,60 +35,11 @@ export async function GET(request: Request) {
     const date = searchParams.get('date');
     const group = searchParams.get('group');
 
-    let query = supabase
-      .from('matches')
-      .select('*, team_a:teams!team_a_id(*), team_b:teams!team_b_id(*)')
-      .order('match_date')
-      .order('kickoff_time');
+    // Lazy auto-start scheduled -> live bila kickoff (WIB = UTC+7) sudah lewat
+    await dbMatches.autoStartDueMatches();
 
-    if (status) {
-      query = query.eq('status', status);
-    }
-    if (date) {
-      query = query.eq('match_date', date);
-    }
-    if (group) {
-      query = query.eq('group_name', group);
-    }
-
-    // Lazy auto-start (pengganti Vercel Cron yang diblokir di paket Hobby):
-    // promosikan scheduled -> live bila kickoff (WIB = UTC+7) sudah lewat.
-    // Best-effort: kegagalan tidak boleh menggagalkan GET.
-    try {
-      if (isServiceRoleConfigured()) {
-        const now = new Date();
-        const admin = getServiceSupabase();
-        const { data: scheduled } = await admin
-          .from('matches')
-          .select('id, match_date, kickoff_time')
-          .eq('status', 'scheduled')
-          .limit(200);
-        const dueIds = (scheduled ?? [])
-          .filter((m) => {
-            if (!m.match_date || !m.kickoff_time) return false;
-            const kickoff = new Date(`${m.match_date}T${m.kickoff_time}+07:00`);
-            return !Number.isNaN(kickoff.getTime()) && kickoff.getTime() <= now.getTime();
-          })
-          .map((m) => m.id);
-        if (dueIds.length > 0) {
-          await admin
-            .from('matches')
-            .update({ status: 'live', updated_at: now.toISOString() })
-            .in('id', dueIds);
-        }
-      }
-    } catch {
-      // Abaikan: auto-start tidak boleh merusak respons baca.
-    }
-
-    const { data, error } = await query;
-      
-    if (error) {
-      console.warn('Database warning fetching matches:', (error as Error).message);
-      return NextResponse.json({ success: false, data: [], error: (error as Error).message }, { status: 500 });
-    }
-    
-    return NextResponse.json({ success: true, data: data || [] });
+    const data = await dbMatches.getAll({ status, date, group });
+    return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
     console.error('Fetch matches error:', error);
     return NextResponse.json({ success: false, data: [], error: (error as Error).message }, { status: 500 });
@@ -103,8 +54,8 @@ export async function POST(request: Request) {
     }
     await audit(session, 'create_match', 'matches');
 
-    if (!isServiceRoleConfigured()) {
-      return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+    if (!isDatabaseWritable()) {
+      return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
     }
     
     const parsedBody = await parseJsonBody(request);
@@ -115,10 +66,12 @@ export async function POST(request: Request) {
     const team_b_id = typeof body?.team_b_id === 'string' ? body.team_b_id : '';
     const match_date = typeof body?.match_date === 'string' ? body.match_date.trim() : '';
     const kickoff_time = typeof body?.kickoff_time === 'string' ? body.kickoff_time.trim() : '';
-    // Kategori menentukan lapangan otomatis: U10 → Lapangan 1, U12 → Lapangan 2.
     const category =
       typeof body?.category === 'string' ? body.category.trim().toUpperCase() : '';
-    const field = category === 'U10' ? '1' : category === 'U12' ? '2' : '';
+    const field =
+      typeof body?.field === 'string' && body.field.trim()
+        ? body.field.trim()
+        : (category === 'U12' ? '2' : '1');
 
     if (!team_a_id || !team_b_id || !match_date || !kickoff_time || !category) {
       return NextResponse.json({ success: false, error: 'Tim, kategori, tanggal, dan jam wajib diisi.' }, { status: 400 });
@@ -139,18 +92,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Kategori harus U10 atau U12.' }, { status: 400 });
     }
 
-    const adminSupabase = getServiceSupabase();
+    const [teamA, teamB] = await Promise.all([
+      dbTeams.getById(team_a_id),
+      dbTeams.getById(team_b_id),
+    ]);
 
-    // Tim A/B harus satu kategori dengan pertandingan (U10 tak bisa lawan U12).
-    const { data: pair, error: pairErr } = await adminSupabase
-      .from('teams')
-      .select('id, category')
-      .in('id', [team_a_id, team_b_id]);
-    if (pairErr) throw pairErr;
-    if (!pair || pair.length !== 2) {
+    if (!teamA || !teamB) {
       return NextResponse.json({ success: false, error: 'Salah satu tim tidak ditemukan.' }, { status: 400 });
     }
-    if (pair.some((t) => t.category !== category)) {
+    if (teamA.category !== category || teamB.category !== category) {
       return NextResponse.json(
         { success: false, error: `Kedua tim harus berkategori ${category}.` },
         { status: 400 }
@@ -167,13 +117,20 @@ export async function POST(request: Request) {
     const group_name =
       typeof body?.group_name === 'string' && body.group_name.trim() ? body.group_name.trim() : null;
 
-    const { data, error } = await adminSupabase
-      .from('matches')
-      .insert({ team_a_id, team_b_id, match_date, kickoff_time, field, status, stage, group_name, category })
-      .select('*, team_a:teams!team_a_id(*), team_b:teams!team_b_id(*)')
-      .single();
-
-    if (error) throw error;
+    const data = await dbMatches.create({
+      id: crypto.randomUUID(),
+      team_a_id,
+      team_b_id,
+      match_date,
+      kickoff_time,
+      field,
+      status,
+      stage,
+      group_name,
+      category,
+      score_a: 0,
+      score_b: 0,
+    });
 
     return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
@@ -181,3 +138,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: (error as Error).message || 'Terjadi kesalahan' }, { status: 500 });
   }
 }
+

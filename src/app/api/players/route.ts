@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
-  supabase,
-  getServiceSupabase,
-  isSupabaseConfigured,
-  isServiceRoleConfigured,
-  SUPABASE_MISCONFIGURED_MESSAGE,
-  SUPABASE_MISSING_SERVICE_KEY_MESSAGE,
-} from '@/lib/supabase';
+  dbPlayers,
+  dbTeams,
+  isDatabaseConfigured,
+  isDatabaseWritable,
+  DB_MISCONFIGURED_MESSAGE,
+  DB_READONLY_MESSAGE,
+} from '@/lib/db';
 import { requireSuperAdmin } from '@/lib/auth';
 import { audit } from '@/lib/admin-users';
 import { parseJsonBody } from '@/lib/http';
@@ -18,28 +18,23 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const POSITIONS = ['GK', 'DF', 'MF', 'FW'] as const;
 
 export async function GET(request: Request) {
-  if (!isSupabaseConfigured()) {
+  if (!isDatabaseConfigured()) {
     return NextResponse.json(
-      { success: false, data: [], error: SUPABASE_MISCONFIGURED_MESSAGE },
+      { success: false, data: [], error: DB_MISCONFIGURED_MESSAGE },
       { status: 503 }
     );
   }
 
   try {
     const { searchParams } = new URL(request.url);
-    const teamId = searchParams.get('team_id');
+    const teamId = searchParams.get('team_id') || undefined;
 
-    let query = supabase.from('players').select('*').order('jersey_number', { nullsFirst: false }).order('name');
-    if (teamId) {
-      if (!UUID_RE.test(teamId)) {
-        return NextResponse.json({ success: false, error: 'ID tim tidak valid.' }, { status: 400 });
-      }
-      query = query.eq('team_id', teamId);
+    if (teamId && !UUID_RE.test(teamId)) {
+      return NextResponse.json({ success: false, error: 'ID tim tidak valid.' }, { status: 400 });
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return NextResponse.json({ success: true, data: data || [] });
+    const data = await dbPlayers.getAll(teamId);
+    return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
     console.error('Fetch players error:', error);
     return NextResponse.json({ success: false, data: [], error: (error as Error).message }, { status: 500 });
@@ -54,8 +49,8 @@ export async function POST(request: Request) {
     }
     await audit(session, 'create_player', 'players');
 
-    if (!isServiceRoleConfigured()) {
-      return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+    if (!isDatabaseWritable()) {
+      return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
     }
 
     const parsedBody = await parseJsonBody(request);
@@ -80,18 +75,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Posisi harus GK, DF, MF, atau FW.' }, { status: 400 });
     }
 
-    const adminSupabase = getServiceSupabase();
-    const { data: team } = await adminSupabase.from('teams').select('id').eq('id', team_id).single();
+    const team = await dbTeams.getById(team_id);
     if (!team) {
       return NextResponse.json({ success: false, error: 'Tim tidak ditemukan.' }, { status: 400 });
     }
 
-    const { data, error } = await adminSupabase
-      .from('players')
-      .insert({ team_id, name, jersey_number, position })
-      .select()
-      .single();
-    if (error) throw error;
+    const data = await dbPlayers.create({
+      id: crypto.randomUUID(),
+      team_id,
+      name,
+      jersey_number,
+      position,
+    });
 
     return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
@@ -99,3 +94,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: (error as Error).message || 'Terjadi kesalahan' }, { status: 500 });
   }
 }
+

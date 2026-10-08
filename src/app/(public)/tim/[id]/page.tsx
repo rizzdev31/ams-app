@@ -62,7 +62,7 @@ export default function TeamDetailPage() {
       </Link>
 
       <header className="mt-4 flex flex-wrap items-center gap-5 rounded-[28px] border border-line bg-gradient-to-bl from-raise to-ink p-6">
-        <Monogram name={team.name} shortName={team.short_name} color={team.color} size={72} />
+        <Monogram name={team.name} shortName={team.short_name} logoUrl={team.logo_url} color={team.color} size={80} />
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-3xl font-extrabold md:text-4xl">{team.name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3">

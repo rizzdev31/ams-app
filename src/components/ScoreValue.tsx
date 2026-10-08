@@ -46,7 +46,7 @@ export default function ScorePair({
 
   return (
     <p
-      className={`num relative flex items-center gap-2 ${size}`}
+      className={`num relative flex items-center gap-1 sm:gap-2 ${size}`}
       aria-label={label}
       aria-live="polite"
     >

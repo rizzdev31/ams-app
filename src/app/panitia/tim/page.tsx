@@ -165,7 +165,13 @@ export default function TimPanitia() {
                     <button
                       key={c}
                       type="button"
-                      onClick={() => setFormData({ ...formData, category: c })}
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          category: c,
+                          group_name: c === 'U12' ? 'W' : 'A',
+                        }))
+                      }
                       aria-pressed={formData.category === c}
                       className={`label h-11 flex-1 rounded-full ${
                         formData.category === c ? 'bg-text text-ink' : 'text-muted'
@@ -203,7 +209,7 @@ export default function TimPanitia() {
                     onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
                     className={`${input} mt-1.5`}
                   >
-                    {['A', 'B', 'C', 'D'].map((g) => (
+                    {(formData.category === 'U12' ? ['W', 'X', 'Y', 'Z'] : ['A', 'B', 'C', 'D']).map((g) => (
                       <option key={g} value={g}>
                         Grup {g}
                       </option>
@@ -226,6 +232,100 @@ export default function TimPanitia() {
                   <span className="label text-muted">{formData.color}</span>
                 </div>
               </div>
+
+              {/* Setting Logo Tim (Tanpa Background) */}
+              <div className="rounded-2xl border border-line bg-raise/40 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="t-logo" className="label block text-muted">
+                    Logo Tim (Tanpa Background)
+                  </label>
+                  {formData.logo_url && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, logo_url: '' })}
+                      className="text-[11px] text-danger hover:underline"
+                    >
+                      Hapus Logo
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+                  <div className="space-y-2 min-w-0">
+                    <input
+                      id="t-logo"
+                      type="text"
+                      placeholder="URL logo atau /logoutama.png"
+                      value={formData.logo_url || ''}
+                      onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
+                      className="h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-text outline-none focus:border-blue"
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="label cursor-pointer rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs text-text hover:border-blue hover:text-blue transition-colors">
+                        📁 Pilih File Logo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 2 * 1024 * 1024) {
+                                alert('Ukuran logo maksimal 2MB.');
+                                return;
+                              }
+                              const img = new Image();
+                              const objectUrl = URL.createObjectURL(file);
+                              img.onload = () => {
+                                URL.revokeObjectURL(objectUrl);
+                                const canvas = document.createElement('canvas');
+                                const maxDim = 160;
+                                let { width, height } = img;
+                                if (width > maxDim || height > maxDim) {
+                                  if (width > height) {
+                                    height = Math.round((height * maxDim) / width);
+                                    width = maxDim;
+                                  } else {
+                                    width = Math.round((width * maxDim) / height);
+                                    height = maxDim;
+                                  }
+                                }
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                if (ctx) {
+                                  ctx.drawImage(img, 0, 0, width, height);
+                                  const compressedDataUrl = canvas.toDataURL('image/webp', 0.88);
+                                  setFormData((prev) => ({ ...prev, logo_url: compressedDataUrl }));
+                                }
+                              };
+                              img.onerror = () => {
+                                URL.revokeObjectURL(objectUrl);
+                                alert('Gagal membaca gambar logo.');
+                              };
+                              img.src = objectUrl;
+                            }
+                          }}
+                        />
+                      </label>
+                      <span className="text-[11px] text-muted">PNG transparan disarankan</span>
+                    </div>
+                  </div>
+
+                  {/* Preview Logo Transparan */}
+                  <div className="flex flex-col items-center justify-center p-2 rounded-xl border border-line/60 bg-ink/70 w-16 h-16 flex-none">
+                    <Monogram
+                      name={formData.name || 'Tim'}
+                      shortName={formData.short_name || 'TIM'}
+                      logoUrl={formData.logo_url}
+                      color={formData.color}
+                      size={44}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
@@ -273,7 +373,13 @@ export default function TimPanitia() {
                 <tr key={team.id} className="border-b border-line last:border-0">
                   <td className="px-5 py-3">
                     <span className="flex items-center gap-3">
-                      <Monogram name={team.name} shortName={team.short_name} color={team.color} size={36} />
+                      <Monogram
+                        name={team.name}
+                        shortName={team.short_name}
+                        logoUrl={team.logo_url}
+                        color={team.color}
+                        size={36}
+                      />
                       <span>
                         <span className="block font-bold">{team.name}</span>
                         <span className="label text-muted">{team.short_name}</span>

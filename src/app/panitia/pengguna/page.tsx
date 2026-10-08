@@ -20,7 +20,7 @@ export default function PenggunaPage() {
 
   const load = async () => {
     try {
-      const res = await fetch('/api/panitia/users', { cache: 'no-store' });
+      const res = await fetch('/api/admin/users', { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || `Gagal memuat daftar pengguna (HTTP ${res.status}).`);
@@ -44,7 +44,7 @@ export default function PenggunaPage() {
     setCreating(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/panitia/users', {
+      const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -67,7 +67,7 @@ export default function PenggunaPage() {
   const patch = async (id: string, role: string, active: boolean) => {
     setMessage(null);
     try {
-      const res = await fetch('/api/panitia/users', {
+      const res = await fetch('/api/admin/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, role, active }),
@@ -87,7 +87,7 @@ export default function PenggunaPage() {
     if (!window.confirm(`Hapus pengguna "${username ?? id}"? Tindakan ini tidak bisa dibatalkan.`)) return;
     setMessage(null);
     try {
-      const res = await fetch(`/api/panitia/users?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setMessage({ type: 'error', text: data.error || 'Gagal menghapus.' });

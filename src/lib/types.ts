@@ -1,7 +1,7 @@
 // === Database Types ===
 
 export type MatchStatus = 'scheduled' | 'live' | 'halftime' | 'finished';
-export type MatchStage = 'grup' | 'semifinal' | 'final';
+export type MatchStage = 'grup' | 'perempat_final' | 'semifinal' | 'juara_3' | 'final';
 
 export interface Team {
   id: string;
@@ -30,11 +30,33 @@ export interface Match {
   updated_at: string;
   /** Kategori kompetisi: 'U10' | 'U12'. Opsional sampai migrasi Fase 3. */
   category?: string | null;
+  /** Skor adu penalti (khusus babak sistem gugur jika skor normal imbang) */
+  penalty_score_a?: number | null;
+  penalty_score_b?: number | null;
+  /** ID Tim pemenang yang ditentukan secara eksplisit (penalti / WO / diskualifikasi / coin toss) */
+  winner_team_id?: string | null;
+  /** Catatan khusus pertandingan (misal: "Menang Adu Penalti 3-2", "WO 3-0", dll) */
+  notes?: string | null;
+}
+
+export type MatchEventType = 'goal' | 'yellow_card' | 'red_card';
+
+export interface MatchEvent {
+  id: string;
+  match_id: string;
+  team_id: string;
+  player_id?: string | null;
+  player_name: string;
+  type: MatchEventType;
+  minute: number;
+  note?: string | null;
+  created_at?: string;
 }
 
 export interface MatchWithTeams extends Match {
   team_a: Team;
   team_b: Team;
+  events?: MatchEvent[];
 }
 
 export type PlayerPosition = 'GK' | 'DF' | 'MF' | 'FW';
@@ -58,6 +80,9 @@ export interface EventSettings {
   rules_text: string | null;
   tiebreak_rules: string;
   contact_info: string | null;
+  passcode_field_1?: string;
+  passcode_field_2?: string;
+  passcode_scorer?: string;
 }
 
 // === Computed Types ===
@@ -106,3 +131,28 @@ export interface MatchFormData {
   group_name?: string;
   category: string;
 }
+
+// === Sponsorship Types ===
+
+export type SponsorTier = 'platinum' | 'gold' | 'silver' | 'partner';
+
+export interface Sponsor {
+  id: string;
+  name: string;
+  logo_url: string;
+  tier: SponsorTier;
+  website_url?: string | null;
+  display_order: number;
+  active: boolean;
+  created_at?: string;
+}
+
+export interface SponsorFormData {
+  name: string;
+  logo_url: string;
+  tier: SponsorTier;
+  website_url?: string;
+  display_order?: number;
+  active?: boolean;
+}
+

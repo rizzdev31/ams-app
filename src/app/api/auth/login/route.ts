@@ -7,7 +7,7 @@ import {
   verifyUserPassword,
   audit,
 } from '@/lib/admin-users';
-import { isServiceRoleConfigured, SUPABASE_MISSING_SERVICE_KEY_MESSAGE } from '@/lib/supabase';
+import { isDatabaseWritable, DB_READONLY_MESSAGE } from '@/lib/db';
 import { parseJsonBody } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
@@ -37,8 +37,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Terlalu banyak percobaan login. Silakan coba lagi nanti.' }, { status: 429 });
     }
 
-    if (!isServiceRoleConfigured()) {
-      return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+    if (!isDatabaseWritable()) {
+      return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
     }
 
     const parsedBody = await parseJsonBody(request);
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     cookieStore.set(COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/',
       maxAge: SESSION_DURATION,
     });

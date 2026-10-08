@@ -5,16 +5,18 @@ import { cookies } from 'next/headers';
 export async function GET() {
   try {
     const session = await getSession();
+    const cookieStore = await cookies();
     if (!session) {
+      // Hapus cookie sesi usang dari browser jika tidak valid lagi di database
+      cookieStore.delete(COOKIE_NAME);
       return NextResponse.json({ success: false, authenticated: false }, { status: 401 });
     }
     // Sliding session: setiap check aktif memperpanjang cookie sebesar SESSION_DURATION.
     const token = await createSession({ sub: session.sub, username: session.username, role: session.role });
-    const cookieStore = await cookies();
     cookieStore.set(COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/',
       maxAge: SESSION_DURATION,
     });

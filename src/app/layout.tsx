@@ -45,6 +45,10 @@ export const metadata: Metadata = {
     locale: "id_ID",
   },
   robots: { index: true, follow: true },
+  icons: {
+    icon: '/logoutama.png',
+    apple: '/logoutama.png',
+  },
 };
 
 export const viewport: Viewport = {

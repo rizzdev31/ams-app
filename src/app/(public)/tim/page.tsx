@@ -57,8 +57,9 @@ export default function TimPage() {
                     <Monogram
                       name={team.name}
                       shortName={team.short_name}
+                      logoUrl={team.logo_url}
                       color={team.color}
-                      size={56}
+                      size={64}
                     />
                     <span className="font-display text-[19px] font-bold leading-tight group-hover:text-blue">
                       {team.name}

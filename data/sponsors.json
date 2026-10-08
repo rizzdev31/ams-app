@@ -1,0 +1,12 @@
+[
+  {
+    "id": "s-annur-platinum",
+    "name": "Yayasan An-Nur",
+    "logo_url": "/logoutama.png",
+    "tier": "platinum",
+    "website_url": null,
+    "display_order": 1,
+    "active": true,
+    "created_at": "2026-10-07T00:00:00.000Z"
+  }
+]

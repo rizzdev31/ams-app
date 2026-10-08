@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { calculateStandings } from '@/lib/utils';
+import Monogram from '@/components/Monogram';
+import { calculateStandings, getU12LegacyGroup } from '@/lib/utils';
 import { useCategory } from '@/hooks/useCategory';
 import { matchesStore, teamsStore, useResource } from '@/lib/live-store';
 
 const COLS: { key: string; label: string; title: string }[] = [
-  { key: 'played', label: 'M', title: 'Main' },
+  { key: 'played', label: 'Mn', title: 'Main' },
   { key: 'won', label: 'M', title: 'Menang' },
   { key: 'drawn', label: 'S', title: 'Seri' },
   { key: 'lost', label: 'K', title: 'Kalah' },
@@ -45,14 +46,14 @@ export default function KlasemenPage() {
           Klasemen
         </h1>
         {categories.length > 0 && (
-          <div className="pill gap-0.5 p-1" role="group" aria-label="Kategori">
+          <div className="pill gap-0.5 p-1 max-w-full overflow-x-auto scrollbar-hide" role="group" aria-label="Kategori">
             {categories.map((c) => (
               <button
                 key={c}
                 aria-pressed={activeCategory === c}
                 onClick={() => setCategory(c)}
-                className={`label rounded-full px-5 py-2.5 transition-colors ${
-                  activeCategory === c ? 'bg-text text-ink' : 'text-muted hover:text-text'
+                className={`label shrink-0 rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 transition-colors ${
+                  activeCategory === c ? 'bg-text text-ink font-bold' : 'text-muted hover:text-text'
                 }`}
               >
                 {c}
@@ -75,20 +76,27 @@ export default function KlasemenPage() {
         {visible.map((group) => (
           <section key={group.group_name} aria-label={`Grup ${group.group_name}`}>
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="font-display text-2xl font-extrabold">Grup {group.group_name}</h2>
+              <h2 className="font-display text-2xl font-extrabold">
+                Grup {group.group_name}
+                {activeCategory === 'U12' && getU12LegacyGroup(group.group_name) !== group.group_name ? (
+                  <span className="ml-2 text-base font-normal text-muted">
+                    ({getU12LegacyGroup(group.group_name)})
+                  </span>
+                ) : null}
+              </h2>
               <p className="label text-muted">{group.rows.length} tim</p>
             </div>
 
-            <div className="mt-3 overflow-x-auto rounded-[28px] border border-line bg-surface">
-              <table className="w-full min-w-[580px] border-collapse">
+            <div className="mt-3 overflow-x-auto rounded-2xl sm:rounded-[28px] border border-line bg-surface scrollbar-hide">
+              <table className="w-full min-w-[500px] border-collapse">
                 <thead>
-                  <tr className="border-b border-line">
-                    <th scope="col" className="label w-14 px-4 py-4 text-center text-muted">
+                  <tr className="border-b border-line text-xs">
+                    <th scope="col" className="label w-12 sm:w-14 px-2.5 sm:px-4 py-3.5 text-center text-muted">
                       #
                     </th>
                     <th
                       scope="col"
-                      className="label sticky left-0 bg-surface px-4 py-4 text-left"
+                      className="label px-2.5 sm:px-4 py-3.5 text-left text-muted"
                     >
                       Tim
                     </th>
@@ -97,29 +105,29 @@ export default function KlasemenPage() {
                         key={`${c.label}${i}`}
                         scope="col"
                         title={c.title}
-                        className="label w-9 px-1 py-4 text-center text-muted"
+                        className="label w-8 sm:w-9 px-1 py-3.5 text-center text-muted"
                       >
                         {c.label}
                       </th>
                     ))}
                     <th
                       scope="col"
-                      className="label hidden w-10 px-1 py-4 text-center text-muted md:table-cell"
+                      className="label hidden w-10 px-1 py-3.5 text-center text-muted md:table-cell"
                     >
                       GM
                     </th>
                     <th
                       scope="col"
-                      className="label hidden w-10 px-1 py-4 text-center text-muted md:table-cell"
+                      className="label hidden w-10 px-1 py-3.5 text-center text-muted md:table-cell"
                     >
                       GK
                     </th>
-                    <th scope="col" className="label w-11 px-1 py-4 text-center text-muted">
+                    <th scope="col" className="label w-10 sm:w-11 px-1 py-3.5 text-center text-muted">
                       SG
                     </th>
                     <th
                       scope="col"
-                      className="label sticky right-0 bg-surface px-4 py-4 text-right"
+                      className="label px-3 sm:px-4 py-3.5 text-right text-muted"
                     >
                       Poin
                     </th>
@@ -134,7 +142,7 @@ export default function KlasemenPage() {
                         i === 0 ? 'bg-[#0E1832]' : ''
                       }`}
                     >
-                      <td className="num sticky left-0 w-14 bg-inherit px-4 py-3.5 text-center text-lg">
+                      <td className="num w-12 sm:w-14 px-2.5 sm:px-4 py-3 sm:py-3.5 text-center text-base sm:text-lg">
                         <span className="inline-flex items-center gap-1.5">
                           {i === 0 && (
                             <span
@@ -145,29 +153,36 @@ export default function KlasemenPage() {
                           {i + 1}
                         </span>
                       </td>
-                      <td className="sticky left-0 bg-inherit px-4 py-3.5">
+                      <td className="px-2.5 sm:px-4 py-3 sm:py-3.5">
                         <Link
                           href={`/tim/${row.team.id}`}
-                          className="font-display text-[19px] font-bold leading-tight hover:text-blue"
+                          className="inline-flex items-center gap-2 sm:gap-2.5 font-display text-[15px] sm:text-[18px] font-bold leading-tight hover:text-blue group"
                         >
-                          {row.team.name}
+                          <Monogram
+                            name={row.team.name}
+                            shortName={row.team.short_name}
+                            logoUrl={row.team.logo_url}
+                            color={row.team.color}
+                            size={26}
+                          />
+                          <span className="truncate">{row.team.name}</span>
                         </Link>
                       </td>
                       {COLS.map((c, k) => (
-                        <td key={k} className="num px-1 py-3.5 text-center text-base text-text">
+                        <td key={k} className="num px-1 py-3 sm:py-3.5 text-center text-sm sm:text-base text-text">
                           {row[c.key as keyof typeof row] as number}
                         </td>
                       ))}
-                      <td className="num hidden px-1 py-3.5 text-center text-base text-muted md:table-cell">
+                      <td className="num hidden px-1 py-3 sm:py-3.5 text-center text-sm sm:text-base text-muted md:table-cell">
                         {row.goals_for}
                       </td>
-                      <td className="num hidden px-1 py-3.5 text-center text-base text-muted md:table-cell">
+                      <td className="num hidden px-1 py-3 sm:py-3.5 text-center text-sm sm:text-base text-muted md:table-cell">
                         {row.goals_against}
                       </td>
-                      <td className="num px-1 py-3.5 text-center text-base text-text">
+                      <td className="num px-1 py-3 sm:py-3.5 text-center text-sm sm:text-base text-text">
                         {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
                       </td>
-                      <td className="num sticky right-0 bg-inherit px-4 py-3.5 text-right text-[28px]">
+                      <td className="num px-3 sm:px-4 py-3 sm:py-3.5 text-right text-[22px] sm:text-[28px] font-bold text-yellow sm:text-text">
                         {row.points}
                       </td>
                     </tr>
@@ -183,6 +198,86 @@ export default function KlasemenPage() {
             Klasemen muncul setelah pertandingan pertama selesai.
           </p>
         )}
+
+        {/* Aturan Poin & Tiebreaker Fase Grup */}
+        <div className="rounded-3xl border border-line bg-surface/70 p-5 sm:p-6 backdrop-blur-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line/60 pb-4">
+            <div>
+              <h3 className="font-display text-base sm:text-lg font-extrabold text-text flex items-center gap-2">
+                <span>📋</span>
+                <span>Regulasi & Aturan Klasemen Fase Grup</span>
+              </h3>
+              <p className="text-xs text-muted mt-0.5">
+                Setiap tim bermain 3 kali di fase grup. Peringkat 1 & 2 melaju ke Babak 8 Besar (Bagan Sistem Gugur).
+              </p>
+            </div>
+            <Link
+              href="/bagan"
+              className="label inline-flex items-center gap-2 rounded-full border border-blue/40 bg-blue/10 px-4 py-2 text-xs font-bold text-blue hover:bg-blue/20 transition-colors w-fit flex-none"
+            >
+              <span>🏆</span>
+              <span>Lihat Bagan 8 Besar</span>
+              <span>→</span>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            {/* Box 1: Sistem Poin */}
+            <div className="rounded-2xl border border-line/60 bg-raise/40 p-4 space-y-2">
+              <span className="font-bold text-text uppercase tracking-wider text-[11px] block text-blue">
+                1. Sistem Perhitungan Poin
+              </span>
+              <ul className="space-y-1.5 text-muted">
+                <li className="flex items-center justify-between">
+                  <span>Menang (Win)</span>
+                  <span className="font-mono font-bold text-text bg-line/60 px-2 py-0.5 rounded">2 Poin</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span>Seri (Draw)</span>
+                  <span className="font-mono font-bold text-text bg-line/60 px-2 py-0.5 rounded">1 Poin</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span>Kalah (Loss)</span>
+                  <span className="font-mono font-bold text-text bg-line/60 px-2 py-0.5 rounded">0 Poin</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 2: Hierarki Tiebreaker */}
+            <div className="rounded-2xl border border-line/60 bg-raise/40 p-4 space-y-2">
+              <span className="font-bold text-text uppercase tracking-wider text-[11px] block text-yellow">
+                2. Penentu Peringkat (Tiebreaker)
+              </span>
+              <ol className="list-decimal list-inside space-y-1 text-muted">
+                <li><b className="text-text">Akumulasi Poin Tertinggi</b></li>
+                <li><b className="text-text">Selisih Gol (SG)</b>: GM dikurangi GK</li>
+                <li><b className="text-text">Produktivitas Gol (GM)</b>: Gol dicetak</li>
+                <li><b className="text-text">Head-to-Head (H2H)</b>: Laga langsung</li>
+                <li><b className="text-text">Kebobolan Tersedikit (GK)</b></li>
+              </ol>
+            </div>
+
+            {/* Box 3: Kelolosan Babak Gugur */}
+            <div className="rounded-2xl border border-line/60 bg-raise/40 p-4 space-y-2">
+              <span className="font-bold text-text uppercase tracking-wider text-[11px] block text-emerald-400">
+                3. Tiket Lolos ke 8 Besar
+              </span>
+              <ul className="space-y-1.5 text-muted">
+                <li className="flex items-start gap-2">
+                  <span className="h-4 w-4 rounded-full bg-yellow text-ink font-black text-[10px] inline-flex items-center justify-center flex-none mt-0.5">1</span>
+                  <span><b className="text-text">Juara Grup</b>: Lolos otomatis ke 8 Besar</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="h-4 w-4 rounded-full bg-line text-text font-black text-[10px] inline-flex items-center justify-center flex-none mt-0.5">2</span>
+                  <span><b className="text-text">Runner-up Grup</b>: Lolos otomatis ke 8 Besar</span>
+                </li>
+                <li className="text-[11px] text-muted/70 pt-1 border-t border-line/30">
+                  Total 8 tim terbaik melaju ke Perempat Final sistem gugur.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

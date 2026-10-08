@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 import { settingsStore, useResource } from '@/lib/live-store';
 import Reveal from '@/components/Reveal';
+import SponsorSection from '@/components/SponsorSection';
 
 const DEFAULT_RULES = [
   'Sistem pertandingan menggunakan babak penyisihan grup dilanjutkan fase gugur (semifinal dan final).',
@@ -129,6 +130,9 @@ export default function InfoPage() {
           </Link>
         </div>
       </section>
+
+      {/* Official Partners & Sponsors */}
+      <SponsorSection className="mt-12" />
     </div>
   );
 }

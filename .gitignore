@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -43,7 +44,7 @@ next-env.d.ts
 # obsidian
 .obsidian/
 
-.vercel
-.env*
-
+# local scratch / test scripts
+scratch/
 .freebuff/
+

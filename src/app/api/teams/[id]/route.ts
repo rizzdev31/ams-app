@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
-import { supabase, getServiceSupabase, isSupabaseConfigured, isServiceRoleConfigured, SUPABASE_MISCONFIGURED_MESSAGE, SUPABASE_MISSING_SERVICE_KEY_MESSAGE } from '@/lib/supabase';
+import {
+  dbTeams,
+  dbMatches,
+  isDatabaseConfigured,
+  isDatabaseWritable,
+  DB_MISCONFIGURED_MESSAGE,
+  DB_READONLY_MESSAGE,
+} from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { audit } from '@/lib/admin-users';
 import { parseJsonBody } from '@/lib/http';
+import { optimizeLogoDataUri } from '@/lib/image-compress';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,23 +25,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ success: false, error: 'ID tim tidak valid.' }, { status: 400 });
     }
 
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ success: false, error: SUPABASE_MISCONFIGURED_MESSAGE }, { status: 503 });
+    if (!isDatabaseConfigured()) {
+      return NextResponse.json({ success: false, error: DB_MISCONFIGURED_MESSAGE }, { status: 503 });
     }
 
-    const { data, error } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('id', id)
-      .single();
-       
-    if (error) {
-      if ((error as { code?: string }).code === 'PGRST116') {
-        return NextResponse.json({ success: false, error: 'Tim tidak ditemukan.' }, { status: 404 });
-      }
-      throw error;
-    }
-    if (!data) return NextResponse.json({ success: false, error: 'Tidak ditemukan' }, { status: 404 });
+    const data = await dbTeams.getById(id);
+    if (!data) return NextResponse.json({ success: false, error: 'Tim tidak ditemukan.' }, { status: 404 });
     
     return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
@@ -55,8 +52,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ success: false, error: 'ID tim tidak valid.' }, { status: 400 });
     }
 
-    if (!isServiceRoleConfigured()) {
-      return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+    if (!isDatabaseWritable()) {
+      return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
     }
 
     const parsedBody = await parseJsonBody(request);
@@ -89,15 +86,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (body?.logo_url !== undefined) {
       const v = typeof body.logo_url === 'string' ? body.logo_url.trim() : '';
       if (v) {
-        try {
-          const parsed = new URL(v);
-          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-            return NextResponse.json({ success: false, error: 'URL logo harus diawali http:// atau https://' }, { status: 400 });
-          }
-        } catch {
-          return NextResponse.json({ success: false, error: 'URL logo tidak valid.' }, { status: 400 });
+        const isHttp = v.startsWith('http://') || v.startsWith('https://');
+        const isRelative = v.startsWith('/');
+        const isDataUri = v.startsWith('data:image/');
+        if (!isHttp && !isRelative && !isDataUri) {
+          return NextResponse.json(
+            { success: false, error: 'URL logo harus berupa link http(s), path gambar /lokal, atau gambar upload.' },
+            { status: 400 }
+          );
         }
-        update.logo_url = v;
+        update.logo_url = await optimizeLogoDataUri(v);
       } else {
         update.logo_url = null;
       }
@@ -114,15 +112,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ success: false, error: 'Tidak ada perubahan untuk disimpan.' }, { status: 400 });
     }
     
-    const adminSupabase = getServiceSupabase();
-    const { data, error } = await adminSupabase
-      .from('teams')
-      .update(update)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
+    const data = await dbTeams.update(id, update);
+    if (!data) {
+      return NextResponse.json({ success: false, error: 'Tim tidak ditemukan.' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
@@ -144,32 +137,18 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return NextResponse.json({ success: false, error: 'ID tim tidak valid.' }, { status: 400 });
     }
 
-    if (!isServiceRoleConfigured()) {
-      return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+    if (!isDatabaseWritable()) {
+      return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
     }
 
-    const adminSupabase = getServiceSupabase();
-    
-    const { count: matchesAsTeamA } = await adminSupabase
-      .from('matches')
-      .select('*', { count: 'exact', head: true })
-      .eq('team_a_id', id);
-      
-    const { count: matchesAsTeamB } = await adminSupabase
-      .from('matches')
-      .select('*', { count: 'exact', head: true })
-      .eq('team_b_id', id);
-      
-    if ((matchesAsTeamA && matchesAsTeamA > 0) || (matchesAsTeamB && matchesAsTeamB > 0)) {
+    // Cek apakah tim sudah punya pertandingan
+    const allMatches = await dbMatches.getAll();
+    const hasMatches = allMatches.some((m) => m.team_a_id === id || m.team_b_id === id);
+    if (hasMatches) {
       return NextResponse.json({ success: false, error: 'Tim tidak bisa dihapus karena sudah memiliki pertandingan' }, { status: 400 });
     }
 
-    const { error } = await adminSupabase
-      .from('teams')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await dbTeams.delete(id);
 
     return NextResponse.json({ success: true, data: null });
   } catch (error: unknown) {
@@ -177,3 +156,4 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ success: false, error: (error as Error).message || 'Terjadi kesalahan' }, { status: 500 });
   }
 }
+

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { findUserById, verifyUserPassword, hashPassword, updatePassword, audit } from '@/lib/admin-users';
-import { isServiceRoleConfigured, SUPABASE_MISSING_SERVICE_KEY_MESSAGE } from '@/lib/supabase';
+import { isDatabaseWritable, DB_READONLY_MESSAGE } from '@/lib/db';
 import { parseJsonBody } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
@@ -11,8 +11,8 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ success: false, error: 'Sesi berakhir, masuk kembali.' }, { status: 401 });
   }
-  if (!isServiceRoleConfigured()) {
-    return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+  if (!isDatabaseWritable()) {
+    return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
   }
   try {
     const parsedBody = await parseJsonBody(request);

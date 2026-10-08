@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   // Pin the workspace root so Turbopack does not walk up into the home directory
   // and pick up an unrelated package-lock.json.
   turbopack: {

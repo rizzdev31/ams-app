@@ -11,6 +11,8 @@ export function calculateStandings(
   const groupTeams = teams.filter((t) => t.group_name === groupName);
   const finishedMatches = matches.filter((m) => {
     if (m.status !== 'finished') return false;
+    // Jangan pernah hitung laga babak gugur (8 besar, semifinal, final) ke klasemen grup
+    if (m.stage && m.stage !== 'grup') return false;
     if (m.group_name === groupName) return true;
     // Fallback: baris matches tanpa group_name tetap dihitung selama
     // kedua timnya ada di grup ini (data lama bisa NULL/kosong).
@@ -56,15 +58,42 @@ export function calculateStandings(
       goals_for: gf,
       goals_against: ga,
       goal_difference: gf - ga,
-      points: won * 3 + drawn,
+      // Regulasi Resmi Turnamen: Menang = 2 Poin, Seri = 1 Poin, Kalah = 0 Poin
+      points: won * 2 + drawn,
     };
   });
 
-  // Sort: points → goal difference → goals for
+  // Helper untuk menentukan hasil Head-to-Head langsung antara 2 tim
+  const getHeadToHead = (teamAId: string, teamBId: string): number => {
+    const directMatch = finishedMatches.find(
+      (m) =>
+        (m.team_a_id === teamAId && m.team_b_id === teamBId) ||
+        (m.team_a_id === teamBId && m.team_b_id === teamAId)
+    );
+    if (!directMatch) return 0;
+    const scoreA = directMatch.team_a_id === teamAId ? directMatch.score_a : directMatch.score_b;
+    const scoreB = directMatch.team_a_id === teamBId ? directMatch.score_a : directMatch.score_b;
+    return scoreA - scoreB; // >0 jika A menang, <0 jika B menang
+  };
+
+  // Hierarki Tiebreaker Resmi Turnamen:
+  // 1. Akumulasi Poin Tertinggi (M=2, S=1, K=0)
+  // 2. Selisih Gol Tertinggi (Goal Difference = Gol Masuk - Gol Kebobolan)
+  // 3. Produktivitas Gol Tertinggi (Jumlah Gol Memasukkan / Gol Dicetak)
+  // 4. Head-to-Head (Hasil pertemuan langsung antar tim yang berpoin sama)
+  // 5. Gol Kebobolan Tersedikit (Goals Against Terendah)
+  // 6. Urutan Nama Tim (Alfabetis)
   rows.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
     if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference;
-    return b.goals_for - a.goals_for;
+    if (b.goals_for !== a.goals_for) return b.goals_for - a.goals_for;
+
+    const h2h = getHeadToHead(a.team.id, b.team.id);
+    if (h2h !== 0) return -h2h;
+
+    if (a.goals_against !== b.goals_against) return a.goals_against - b.goals_against;
+
+    return a.team.name.localeCompare(b.team.name);
   });
 
   return rows;
@@ -157,6 +186,20 @@ export function getStatusLabel(status: string): string {
 }
 
 /**
+ * Label babak / fase turnamen dalam Bahasa Indonesia
+ */
+export function getStageLabel(stage: string): string {
+  switch (stage) {
+    case 'grup': return 'Babak Grup';
+    case 'perempat_final': return '8 Besar';
+    case 'semifinal': return 'Semifinal';
+    case 'juara_3': return 'Juara 3';
+    case 'final': return 'Final';
+    default: return stage;
+  }
+}
+
+/**
  * Get status color classes
  */
 export function getStatusColor(status: string): string {
@@ -207,3 +250,96 @@ export function getCountdown(targetDate: string): {
     isPast: false,
   };
 }
+
+/**
+ * Pemetaan partai resmi berdasarkan dokumen PDF turnamen:
+ * - U-10 (Jumat, 9 Okt 2026): Partai 1 (07:00) s/d Partai 12 (13:30) dengan Ishoma (11:30-12:30)
+ * - U-12 (Sabtu, 10 Okt 2026): Partai 1 (07:00) s/d Partai 12 (12:30)
+ * - Babak gugur:
+ *   - Perempat Final: 8 Besar · Partai 1 / 2
+ *   - Semifinal: Semifinal · Partai 3
+ *   - Final & Juara 3: Final / Juara 3 · Partai 4
+ */
+export function getMatchPartai(match: {
+  stage?: string | null;
+  kickoff_time?: string | null;
+  category?: string | null;
+}): { partaiNum: number | null; label: string } {
+  const time = match.kickoff_time?.slice(0, 5) || '';
+  const cat = match.category ?? 'U10';
+  const stage = match.stage ?? 'grup';
+
+  if (stage === 'grup') {
+    if (cat === 'U10') {
+      const u10Map: Record<string, number> = {
+        '07:00': 1,
+        '07:30': 2,
+        '08:00': 3,
+        '08:30': 4,
+        '09:00': 5,
+        '09:30': 6,
+        '10:00': 7,
+        '10:30': 8,
+        '11:00': 9,
+        '12:30': 10,
+        '13:00': 11,
+        '13:30': 12,
+      };
+      const num = u10Map[time];
+      if (num) return { partaiNum: num, label: `Partai ${num}` };
+    } else {
+      // U12
+      const u12Map: Record<string, number> = {
+        '07:00': 1,
+        '07:30': 2,
+        '08:00': 3,
+        '08:30': 4,
+        '09:00': 5,
+        '09:30': 6,
+        '10:00': 7,
+        '10:30': 8,
+        '11:00': 9,
+        '11:30': 10,
+        '12:00': 11,
+        '12:30': 12,
+      };
+      const num = u12Map[time];
+      if (num) return { partaiNum: num, label: `Partai ${num}` };
+    }
+    return { partaiNum: null, label: 'Fase Grup' };
+  }
+
+  if (stage === 'perempat_final') {
+    const isFirstWave = (cat === 'U10' && time === '14:00') || (cat === 'U12' && time === '13:00');
+    return {
+      partaiNum: isFirstWave ? 1 : 2,
+      label: `8 Besar (Partai ${isFirstWave ? 1 : 2})`,
+    };
+  }
+  if (stage === 'semifinal') {
+    return { partaiNum: 3, label: 'Semifinal (Partai 3)' };
+  }
+  if (stage === 'final') {
+    return { partaiNum: 4, label: 'Final (Partai 4)' };
+  }
+  if (stage === 'juara_3') {
+    return { partaiNum: 4, label: 'Juara 3 (Partai 4)' };
+  }
+
+  return { partaiNum: null, label: stage };
+}
+
+/**
+ * Mengembalikan kode legacy grup PDF untuk U-12 jika diperlukan (A -> W, B -> X, C -> Y, D -> Z)
+ */
+export function getU12LegacyGroup(group: string | null | undefined): string {
+  if (!group) return '';
+  const map: Record<string, string> = {
+    A: 'W',
+    B: 'X',
+    C: 'Y',
+    D: 'Z',
+  };
+  return map[group.toUpperCase()] || group;
+}
+

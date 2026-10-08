@@ -53,13 +53,14 @@ if (!url || !key) {
 
 const supabase = createClient(url, key);
 
-const [{ data: teams, error: teamsErr }, { data: matches, error: matchesErr }, { data: settings, error: settingsErr }, { data: players, error: playersErr }] =
-  await Promise.all([
-    supabase.from('teams').select('*').order('group_name').order('name'),
-    supabase.from('matches').select('*').order('match_date').order('kickoff_time'),
-    supabase.from('event_settings').select('*').limit(1).maybeSingle(),
-    supabase.from('players').select('*').order('team_id').order('jersey_number', { nullsFirst: false }).order('name'),
-  ]);
+async function run() {
+  const [{ data: teams, error: teamsErr }, { data: matches, error: matchesErr }, { data: settings, error: settingsErr }, { data: players, error: playersErr }] =
+    await Promise.all([
+      supabase.from('teams').select('*').order('category').order('group_name').order('name'),
+      supabase.from('matches').select('*').order('match_date').order('kickoff_time').order('field'),
+      supabase.from('event_settings').select('*').limit(1).maybeSingle(),
+      supabase.from('players').select('*').order('team_id').order('jersey_number', { nullsFirst: false }).order('name'),
+    ]);
 
 if (teamsErr || matchesErr || settingsErr || playersErr) {
   console.error('Gagal membaca database:', teamsErr ?? matchesErr ?? settingsErr ?? playersErr);
@@ -170,3 +171,6 @@ export const SEED_SETTINGS: EventSettings = {
 writeFileSync(join(process.cwd(), 'src', 'lib', 'seed.ts'), file, 'utf8');
 
 console.log(`seed.ts disegarkan: ${teams.length} tim, ${safeMatches.length} pertandingan.`);
+}
+
+run().catch(console.error);

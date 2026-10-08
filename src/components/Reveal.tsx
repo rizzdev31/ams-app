@@ -14,11 +14,13 @@ export default function Reveal({
   index = 0,
   as: Tag = 'div',
   className = '',
+  onClick,
 }: {
   children: ReactNode;
   index?: number;
   as?: 'div' | 'section' | 'li' | 'article' | 'h1' | 'h2' | 'h3';
   className?: string;
+  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
   const ref = useRef<HTMLElement>(null);
 
@@ -55,6 +57,7 @@ export default function Reveal({
   return (
     <Tag
       ref={ref as never}
+      onClick={onClick}
       className={`rv ${className}`}
       style={{ ['--i' as string]: index }}
     >

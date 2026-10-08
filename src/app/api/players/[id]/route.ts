@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getServiceSupabase, isServiceRoleConfigured, SUPABASE_MISSING_SERVICE_KEY_MESSAGE } from '@/lib/supabase';
+import {
+  dbPlayers,
+  isDatabaseWritable,
+  DB_READONLY_MESSAGE,
+} from '@/lib/db';
 import { requireSuperAdmin } from '@/lib/auth';
 import { audit } from '@/lib/admin-users';
 import { parseJsonBody } from '@/lib/http';
@@ -22,8 +26,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!UUID_RE.test(id)) {
       return NextResponse.json({ success: false, error: 'ID pemain tidak valid.' }, { status: 400 });
     }
-    if (!isServiceRoleConfigured()) {
-      return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+    if (!isDatabaseWritable()) {
+      return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
     }
 
     const parsedBody = await parseJsonBody(request);
@@ -65,9 +69,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ success: false, error: 'Tidak ada perubahan untuk disimpan.' }, { status: 400 });
     }
 
-    const adminSupabase = getServiceSupabase();
-    const { data, error } = await adminSupabase.from('players').update(update).eq('id', id).select().single();
-    if (error) throw error;
+    const data = await dbPlayers.update(id, update);
+    if (!data) {
+      return NextResponse.json({ success: false, error: 'Pemain tidak ditemukan.' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
@@ -88,12 +93,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     if (!UUID_RE.test(id)) {
       return NextResponse.json({ success: false, error: 'ID pemain tidak valid.' }, { status: 400 });
     }
-    if (!isServiceRoleConfigured()) {
-      return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+    if (!isDatabaseWritable()) {
+      return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
     }
 
-    const { error } = await getServiceSupabase().from('players').delete().eq('id', id);
-    if (error) throw error;
+    await dbPlayers.delete(id);
 
     return NextResponse.json({ success: true, data: null });
   } catch (error: unknown) {
@@ -101,3 +105,4 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ success: false, error: (error as Error).message || 'Terjadi kesalahan' }, { status: 500 });
   }
 }
+

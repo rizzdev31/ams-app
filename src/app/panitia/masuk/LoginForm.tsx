@@ -26,13 +26,12 @@ export default function LoginForm() {
 
       if (res.ok) {
         const dest = from && from.startsWith('/') && !from.startsWith('//') ? from : '/panitia';
-        router.replace(dest);
-        router.refresh();
+        window.location.href = dest;
         return;
       }
 
-      await res.json().catch(() => ({}));
-      setError('Kata sandi salah.');
+      const data = await res.json().catch(() => ({}));
+      setError(data?.error || 'Nama pengguna atau kata sandi salah.');
     } catch {
       setError('Tidak dapat menghubungi server. Coba lagi.');
     } finally {

@@ -6,6 +6,7 @@ import type {
   EventSettings,
   MatchWithTeams,
   Player,
+  Sponsor,
   Team,
 } from './types';
 import { SEED_MATCHES, SEED_SETTINGS, SEED_TEAMS } from './seed';
@@ -110,6 +111,7 @@ class Resource<T> {
 export const matchesStore = new Resource<MatchWithTeams[]>('/api/matches', SEED_MATCHES);
 export const teamsStore = new Resource<Team[]>('/api/teams', SEED_TEAMS);
 export const settingsStore = new Resource<EventSettings>('/api/settings', SEED_SETTINGS);
+export const sponsorsStore = new Resource<Sponsor[]>('/api/sponsors', []);
 
 /**
  * Tab lain memberi tahu ada yang berubah (committee menyimpan,
@@ -127,6 +129,7 @@ if (channel) {
     void matchesStore.refresh();
     void teamsStore.refresh();
     void settingsStore.refresh();
+    void sponsorsStore.refresh();
   };
 }
 
@@ -138,6 +141,7 @@ if (typeof window !== 'undefined') {
       void matchesStore.refresh();
       void teamsStore.refresh();
       void settingsStore.refresh();
+      void sponsorsStore.refresh();
     }
   });
 }

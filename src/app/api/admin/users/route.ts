@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
 import { listUsers, setUserActive, setUserRole, deleteUser, audit, hashPassword } from '@/lib/admin-users';
-import { getServiceSupabase, isServiceRoleConfigured, SUPABASE_MISSING_SERVICE_KEY_MESSAGE } from '@/lib/supabase';
+import { getServiceSupabase } from '@/lib/supabase';
+import { isMySQLDriver, execute } from '@/lib/mysql';
+import { isDatabaseWritable, DB_READONLY_MESSAGE } from '@/lib/db';
 import { parseJsonBody } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ success: false, error: 'Hanya superadmin.' }, { status: 403 });
-  if (!isServiceRoleConfigured()) return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+  if (!isDatabaseWritable()) return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
   try {
     const users = await listUsers();
     return NextResponse.json({ success: true, data: users });
@@ -22,7 +24,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ success: false, error: 'Hanya superadmin.' }, { status: 403 });
-  if (!isServiceRoleConfigured()) return NextResponse.json({ success: false, error: SUPABASE_MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
+  if (!isDatabaseWritable()) return NextResponse.json({ success: false, error: DB_READONLY_MESSAGE }, { status: 503 });
   try {
     const parsedBody = await parseJsonBody(request);
     if (!parsedBody.ok) return parsedBody.response;
@@ -31,17 +33,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Username wajib, password minimal 8 karakter.' }, { status: 400 });
     }
     const r = role === 'superadmin' ? 'superadmin' : 'admin';
-    const sb = getServiceSupabase();
     const password_hash = await hashPassword(password);
-    const { data, error } = await sb
-      .from('admin_users')
-      .insert({ username: username.trim(), password_hash, role: r })
-      .select('id,username,role,active,created_at')
-      .single();
-    if (error) {
-      if (error.code === '23505') return NextResponse.json({ success: false, error: 'Username sudah dipakai.' }, { status: 409 });
-      throw error;
+    let data: any;
+
+    if (isMySQLDriver()) {
+      const id = crypto.randomUUID();
+      try {
+        await execute(
+          'INSERT INTO admin_users (id, username, password_hash, role, active) VALUES (?, ?, ?, ?, 1)',
+          [id, username.trim(), password_hash, r]
+        );
+      } catch (err: any) {
+        if (err?.code === 'ER_DUP_ENTRY' || err?.message?.includes('Duplicate entry')) {
+          return NextResponse.json({ success: false, error: 'Username sudah dipakai.' }, { status: 409 });
+        }
+        throw err;
+      }
+      data = { id, username: username.trim(), role: r, active: true, created_at: new Date().toISOString() };
+    } else {
+      const sb = getServiceSupabase();
+      const { data: created, error } = await sb
+        .from('admin_users')
+        .insert({ username: username.trim(), password_hash, role: r })
+        .select('id,username,role,active,created_at')
+        .single();
+      if (error) {
+        if (error.code === '23505') return NextResponse.json({ success: false, error: 'Username sudah dipakai.' }, { status: 409 });
+        throw error;
+      }
+      data = created;
     }
+
     await audit(admin, 'create_user', 'admin_users', { username: username.trim(), role: r });
     return NextResponse.json({ success: true, data });
   } catch (e) {

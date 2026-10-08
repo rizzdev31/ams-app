@@ -462,6 +462,39 @@
   animation-play-state: paused;
 }
 
+/* 6b. Slider Sponsor berjalan terus menerus secara mulus */
+@keyframes sponsorSlider {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-sponsor-slider {
+  animation: sponsorSlider 32s linear infinite;
+  will-change: transform;
+}
+.sponsor-slider-host:hover .animate-sponsor-slider {
+  animation-play-state: paused;
+}
+
+@keyframes marqueeTrack {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+.animate-marquee-track {
+  animation: marqueeTrack 28s linear infinite;
+  will-change: transform;
+}
+.sponsor-slider-host:hover .animate-marquee-track {
+  animation-play-state: paused;
+}
+
 /* 7. Bingkai LIVE berputar — hanya pada kartu yang benar-benar live. */
 @keyframes halo {
   to {
@@ -541,7 +574,9 @@
   .animate-draw {
     stroke-dashoffset: 0;
   }
-  .animate-marquee {
+  .animate-marquee,
+  .animate-sponsor-slider,
+  .animate-marquee-track {
     animation: none;
   }
 }

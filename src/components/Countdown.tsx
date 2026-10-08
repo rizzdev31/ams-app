@@ -38,18 +38,18 @@ export default function Countdown({ target }: { target: string }) {
 
   return (
     <div
-      className="mt-8 grid grid-cols-4 gap-2.5"
+      className="mt-6 sm:mt-8 grid grid-cols-4 gap-1.5 sm:gap-2.5"
       role="timer"
       aria-label="Hitung mundur menuju pertandingan pertama"
     >
       {LABELS.map((label, i) => (
-        <div key={label} className="rounded-[22px] border border-line bg-surface px-4 py-3">
-          <span className="num block h-[1.1em] text-[34px] md:text-[52px]" suppressHydrationWarning>
+        <div key={label} className="rounded-2xl sm:rounded-[22px] border border-line bg-surface p-2 sm:px-4 sm:py-3 text-center sm:text-left">
+          <span className="num block h-[1.1em] text-[24px] sm:text-[34px] md:text-[52px]" suppressHydrationWarning>
             <span key={state.ready ? String(state.v[i]) : '--'} className="animate-flip">
               {state.ready ? String(state.v[i]).padStart(2, '0') : '--'}
             </span>
           </span>
-          <span className="label mt-1 block text-muted">{label}</span>
+          <span className="label mt-0.5 sm:mt-1 block text-[10px] sm:text-[11px] text-muted">{label}</span>
         </div>
       ))}
     </div>

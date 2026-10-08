@@ -2,6 +2,8 @@
 // File ini sengaja tanpa dependensi Node agar aman diimpor dari proxy.
 
 export const COOKIE_NAME = 'admin_session';
+export const OPERATOR_COOKIE_NAME = 'operator_session';
+export const OPERATOR_SESSION_DURATION = 48 * 60 * 60; // 48 jam masa aktif turnamen
 
 const FALLBACK = 'default-secret-change-me';
 

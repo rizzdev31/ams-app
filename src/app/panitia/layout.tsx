@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const TABS = [
   { name: 'Skor', path: '/panitia' },
@@ -39,11 +40,13 @@ export default function PanitiaLayout({ children }: { children: React.ReactNode 
           const data = await res.json().catch(() => ({}));
           if (data?.data) setCurrentUser(data.data);
         } else {
-          router.push('/panitia/masuk');
+          window.location.replace('/panitia/masuk');
+          return;
         }
       } catch (error) {
         console.error('Auth check failed:', error);
-        router.push('/panitia/masuk');
+        window.location.replace('/panitia/masuk');
+        return;
       } finally {
         setIsLoading(false);
       }
@@ -67,10 +70,10 @@ export default function PanitiaLayout({ children }: { children: React.ReactNode 
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/panitia/masuk');
     } catch (error) {
       console.error('Logout failed:', error);
-      router.push('/panitia/masuk');
+    } finally {
+      window.location.href = '/panitia/masuk';
     }
   };
 
@@ -88,12 +91,12 @@ export default function PanitiaLayout({ children }: { children: React.ReactNode 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-ink p-6 text-center">
         <p className="text-sm text-muted">Sesi berakhir atau belum masuk.</p>
-        <Link
-          href="/panitia/masuk"
-          className="label inline-flex h-12 items-center rounded-full bg-blue px-6 text-ink"
+        <button
+          onClick={handleLogout}
+          className="label inline-flex h-12 items-center rounded-full bg-blue px-6 text-ink hover:opacity-90 transition-opacity"
         >
           Ke halaman masuk
-        </Link>
+        </button>
       </div>
     );
   }
@@ -104,7 +107,14 @@ export default function PanitiaLayout({ children }: { children: React.ReactNode 
     <div className="min-h-screen bg-ink">
       <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur-md">
         <div className="wrap flex h-14 items-center justify-between gap-3">
-          <Link href="/panitia" className="font-display text-[17px] font-extrabold">
+          <Link href="/panitia" className="flex items-center gap-2.5 font-display text-[17px] font-extrabold">
+            <Image
+              src="/logoutama.png"
+              alt="Logo An-Nur"
+              width={26}
+              height={34}
+              className="h-7 w-auto flex-none object-contain"
+            />
             Panitia
           </Link>
           <div className="flex items-center gap-3">
