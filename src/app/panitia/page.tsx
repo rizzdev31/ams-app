@@ -7,6 +7,7 @@ import { formatTime, todayWIB, getMatchPartai } from '@/lib/utils';
 import {
   announceChangeEverywhere,
   matchesStore,
+  settingsStore,
   useResource,
 } from '@/lib/live-store';
 import CategoryMark from '@/components/CategoryMark';
@@ -30,8 +31,16 @@ export default function SkorTab() {
   // Committee membaca store yang sama dengan halaman publik. Skor yang diinput
   // langsung terlihat di semua tab tanpa menunggu polling.
   const [matches, online, reload] = useResource(matchesStore);
+  const [settings] = useResource(settingsStore);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState('Semua');
+
+  // Sinkronkan filter awal dengan fokus turnamen aktif dari pengaturan (misal U-12)
+  useEffect(() => {
+    if (settings?.active_category && (settings.active_category === 'U10' || settings.active_category === 'U12')) {
+      setFilter(settings.active_category);
+    }
+  }, [settings?.active_category]);
   const [isRevising, setIsRevising] = useState<boolean>(false);
   const [saveState, setSaveState] = useState<{ kind: 'idle' | 'saving' | 'saved' | 'error'; time: string }>({
     kind: 'idle',

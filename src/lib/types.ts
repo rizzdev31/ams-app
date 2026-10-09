@@ -83,6 +83,50 @@ export interface EventSettings {
   passcode_field_1?: string;
   passcode_field_2?: string;
   passcode_scorer?: string;
+  /** Kategori fokus turnamen yang sedang berjalan aktif: 'U10' | 'U12' | 'Semua' */
+  active_category?: string;
+  /** Tanggal pertandingan fokus turnamen yang sedang berjalan aktif: '2026-10-09' | '2026-10-10' */
+  active_date?: string;
+}
+
+// === Archive / Container Snapshot Types ===
+
+export interface TournamentArchiveSnapshot {
+  archived_at: string;
+  category: string;
+  total_teams: number;
+  total_matches: number;
+  finished_matches: number;
+  champion_name?: string | null;
+  runner_up_name?: string | null;
+  third_place_name?: string | null;
+  fourth_place_name?: string | null;
+  teams: Team[];
+  matches: MatchWithTeams[];
+  group_standings?: Record<string, StandingRow[]>;
+  bracket_summary?: {
+    qf?: { code: string; title: string; score: string; winner?: string; byPenalty?: boolean }[];
+    sf?: { code: string; title: string; score: string; winner?: string; byPenalty?: boolean }[];
+    final?: { title: string; score: string; winner?: string; byPenalty?: boolean };
+    third_place?: { title: string; score: string; winner?: string; byPenalty?: boolean };
+  };
+}
+
+export interface TournamentArchive {
+  id: string;
+  name: string; // Custom nama dari superadmin, misal: "Turnamen U-10 Selesai (9 Okt 2026)"
+  category: string; // 'U10' | 'U12' | 'Semua'
+  match_date?: string | null;
+  description?: string | null;
+  snapshot_data: TournamentArchiveSnapshot;
+  created_at: string;
+}
+
+export interface TournamentArchiveFormData {
+  name: string;
+  category: string;
+  match_date?: string;
+  description?: string;
 }
 
 // === Computed Types ===

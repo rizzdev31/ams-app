@@ -295,4 +295,81 @@ describe('Logika Bagan Babak Gugur (Bracket Logic)', () => {
     expect(qf1.field).toBe('2');
     expect(qf1.winnerTeam?.name).toBe('TPA');
   });
+
+  it('menyelesaikan laga Semifinal dan Final seri lewat adu penalti hingga menentukan Juara 1, 2, 3, dan 4', () => {
+    // Skenario: Semua QF selesai
+    const qfMatches: MatchWithTeams[] = [
+      ...mockMatchesU10,
+      {
+        id: 'qf-1', team_a_id: 't-a1', team_b_id: 't-b2', score_a: 2, score_b: 0, status: 'finished',
+        stage: 'perempat_final', group_name: 'AA', category: 'U10', match_date: '2026-10-09', kickoff_time: '14:00', field: '1', updated_at: '',
+        team_a: mockTeamsU10[0], team_b: mockTeamsU10[3], // TPA menang
+      },
+      {
+        id: 'qf-2', team_a_id: 't-b1', team_b_id: 't-c2', score_a: 3, score_b: 1, status: 'finished',
+        stage: 'perempat_final', group_name: 'BB', category: 'U10', match_date: '2026-10-09', kickoff_time: '14:00', field: '2', updated_at: '',
+        team_a: mockTeamsU10[2], team_b: mockTeamsU10[5], // GPD menang
+      },
+      {
+        id: 'qf-3', team_a_id: 't-c1', team_b_id: 't-d2', score_a: 1, score_b: 0, status: 'finished',
+        stage: 'perempat_final', group_name: 'CC', category: 'U10', match_date: '2026-10-09', kickoff_time: '14:30', field: '1', updated_at: '',
+        team_a: mockTeamsU10[4], team_b: mockTeamsU10[7], // Forsgi menang
+      },
+      {
+        id: 'qf-4', team_a_id: 't-d1', team_b_id: 't-a2', score_a: 2, score_b: 0, status: 'finished',
+        stage: 'perempat_final', group_name: 'DD', category: 'U10', match_date: '2026-10-09', kickoff_time: '14:30', field: '2', updated_at: '',
+        team_a: mockTeamsU10[6], team_b: mockTeamsU10[1], // Sigres menang
+      },
+    ];
+
+    // Semifinal 1 (EE): TPA vs GPD -> Seri 1-1, Adu Penalti 3-4 dimenangkan GPD
+    // Semifinal 2 (FF): Forsgi vs Sigres -> Normal 2-0 dimenangkan Forsgi
+    const sfMatches: MatchWithTeams[] = [
+      ...qfMatches,
+      {
+        id: 'sf-1', team_a_id: 't-a1', team_b_id: 't-b1', score_a: 1, score_b: 1, status: 'finished',
+        penalty_score_a: 3, penalty_score_b: 4, winner_team_id: 't-b1', notes: 'Menang Adu Penalti 4-3',
+        stage: 'semifinal', group_name: 'EE', category: 'U10', match_date: '2026-10-09', kickoff_time: '15:00', field: '1', updated_at: '',
+        team_a: mockTeamsU10[0], team_b: mockTeamsU10[2],
+      },
+      {
+        id: 'sf-2', team_a_id: 't-c1', team_b_id: 't-d1', score_a: 2, score_b: 0, status: 'finished',
+        stage: 'semifinal', group_name: 'FF', category: 'U10', match_date: '2026-10-09', kickoff_time: '15:00', field: '2', updated_at: '',
+        team_a: mockTeamsU10[4], team_b: mockTeamsU10[6],
+      },
+    ];
+
+    const bracketAfterSf = buildTournamentBracket('U10', mockTeamsU10, sfMatches);
+
+    // GPD (pemenang penalti SF1) dan Forsgi (pemenang SF2) harus maju ke Final
+    expect(bracketAfterSf.finalMatch.homeSlot.team?.name).toBe('GPD');
+    expect(bracketAfterSf.finalMatch.awaySlot.team?.name).toBe('Forsgi');
+
+    // TPA (kalah penalti SF1) dan Sigres (kalah SF2) harus masuk ke Perebutan Juara 3
+    expect(bracketAfterSf.thirdPlaceMatch.homeSlot.team?.name).toBe('TPA');
+    expect(bracketAfterSf.thirdPlaceMatch.awaySlot.team?.name).toBe('Sigres');
+
+    // Final: GPD vs Forsgi -> Seri 0-0, Adu Penalti 4-5 dimenangkan Forsgi!
+    const finalMatches: MatchWithTeams[] = [
+      ...sfMatches,
+      {
+        id: 'final-1', team_a_id: 't-b1', team_b_id: 't-c1', score_a: 0, score_b: 0, status: 'finished',
+        penalty_score_a: 4, penalty_score_b: 5, winner_team_id: 't-c1', notes: 'Menang Adu Penalti 5-4',
+        stage: 'final', group_name: 'FINAL', category: 'U10', match_date: '2026-10-09', kickoff_time: '15:30', field: '1', updated_at: '',
+        team_a: mockTeamsU10[2], team_b: mockTeamsU10[4],
+      },
+      {
+        id: 'third-1', team_a_id: 't-a1', team_b_id: 't-d1', score_a: 2, score_b: 1, status: 'finished',
+        stage: 'juara_3', group_name: 'JUARA_3', category: 'U10', match_date: '2026-10-09', kickoff_time: '15:30', field: '2', updated_at: '',
+        team_a: mockTeamsU10[0], team_b: mockTeamsU10[6],
+      },
+    ];
+
+    const fullBracket = buildTournamentBracket('U10', mockTeamsU10, finalMatches);
+    expect(fullBracket.finalMatch.byPenalty).toBe(true);
+    expect(fullBracket.finalMatch.winnerTeam?.name).toBe('Forsgi'); // Juara 1
+    expect(fullBracket.finalMatch.loserTeam?.name).toBe('GPD');     // Juara 2
+    expect(fullBracket.thirdPlaceMatch.winnerTeam?.name).toBe('TPA'); // Juara 3
+    expect(fullBracket.thirdPlaceMatch.loserTeam?.name).toBe('Sigres'); // Juara 4
+  });
 });

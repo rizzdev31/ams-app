@@ -34,6 +34,8 @@ const WRITABLE = [
   'passcode_field_1',
   'passcode_field_2',
   'passcode_scorer',
+  'active_category',
+  'active_date',
 ] as const;
 
 /** Fields that must contain a value, and the 400 message if they don't. */
@@ -49,6 +51,8 @@ const REQUIRED: Record<(typeof WRITABLE)[number], string> = {
   passcode_field_1: '',
   passcode_field_2: '',
   passcode_scorer: '',
+  active_category: '',
+  active_date: '',
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -84,7 +88,7 @@ function sanitiseSettings(input: unknown): Record<string, string | null> {
       throw new Error(REQUIRED[field]);
     }
 
-    if (field === 'start_date' || field === 'end_date') {
+    if (field === 'start_date' || field === 'end_date' || (field === 'active_date' && value.length > 0)) {
       if (!ISO_DATE.test(value)) throw new Error('Format tanggal tidak valid.');
     }
 

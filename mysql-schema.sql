@@ -78,6 +78,8 @@ CREATE TABLE IF NOT EXISTS `event_settings` (
   `passcode_field_1` VARCHAR(50) NOT NULL DEFAULT 'LAP1-2026',
   `passcode_field_2` VARCHAR(50) NOT NULL DEFAULT 'LAP2-2026',
   `passcode_scorer` VARCHAR(50) NOT NULL DEFAULT 'WASIT-2026',
+  `active_category` VARCHAR(10) NOT NULL DEFAULT 'U12',
+  `active_date` DATE NOT NULL DEFAULT '2026-10-10',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -163,6 +165,22 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
   PRIMARY KEY (`id`),
   KEY `idx_audit_user` (`user_id`),
   KEY `idx_audit_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
+-- 9. TABEL TOURNAMENT ARCHIVES (Container Arsip & Snapshot Turnamen)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `tournament_archives` (
+  `id` VARCHAR(36) NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `category` VARCHAR(10) NOT NULL DEFAULT 'U10',
+  `match_date` DATE DEFAULT NULL,
+  `description` TEXT DEFAULT NULL,
+  `snapshot_data` LONGTEXT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_archive_category` (`category`),
+  KEY `idx_archive_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------------------

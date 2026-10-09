@@ -13,6 +13,7 @@ import type {
   Sponsor,
   Match,
   Player,
+  TournamentArchive,
 } from './types';
 import type { AdminUser } from './admin-users';
 
@@ -424,15 +425,35 @@ export const dbMatches = {
 // 3. EVENT SETTINGS REPOSITORY
 // ==========================================
 export const dbSettings = {
+  async ensureColumns(): Promise<void> {
+    if (isMySQLDriver()) {
+      try {
+        const cols = await query<any>("SHOW COLUMNS FROM event_settings LIKE 'active_category'");
+        if (cols.length === 0) {
+          await execute("ALTER TABLE event_settings ADD COLUMN `active_category` VARCHAR(10) DEFAULT 'U12'");
+        }
+        const colsDate = await query<any>("SHOW COLUMNS FROM event_settings LIKE 'active_date'");
+        if (colsDate.length === 0) {
+          await execute("ALTER TABLE event_settings ADD COLUMN `active_date` DATE DEFAULT '2026-10-10'");
+        }
+      } catch {
+        // Abaikan jika tabel belum dibuat atau hak akses terbatas
+      }
+    }
+  },
+
   async get(): Promise<EventSettings | null> {
     if (isMySQLDriver()) {
+      await this.ensureColumns();
       const row = await queryOne<any>(`
         SELECT 
           id, event_name,
           DATE_FORMAT(start_date, '%Y-%m-%d') as start_date,
           DATE_FORMAT(end_date, '%Y-%m-%d') as end_date,
           location, map_url, rules_text, tiebreak_rules, contact_info,
-          passcode_field_1, passcode_field_2, passcode_scorer
+          passcode_field_1, passcode_field_2, passcode_scorer,
+          active_category,
+          DATE_FORMAT(active_date, '%Y-%m-%d') as active_date
         FROM event_settings LIMIT 1
       `);
       return row || null;
@@ -444,12 +465,13 @@ export const dbSettings = {
 
   async update(patch: Partial<EventSettings>): Promise<EventSettings | null> {
     if (isMySQLDriver()) {
+      await this.ensureColumns();
       const existing = await this.get();
       if (!existing) {
         const id = 'f1bc52dd-0df6-4855-a179-bd48875935b6';
         await execute(
-          `INSERT INTO event_settings (id, event_name, start_date, end_date, location, map_url, rules_text, tiebreak_rules, contact_info)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO event_settings (id, event_name, start_date, end_date, location, map_url, rules_text, tiebreak_rules, contact_info, active_category, active_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id,
             patch.event_name || 'An-Nur Mini Soccer',
@@ -460,6 +482,8 @@ export const dbSettings = {
             patch.rules_text || null,
             patch.tiebreak_rules || 'poin → selisih gol → gol masuk',
             patch.contact_info || null,
+            patch.active_category || 'U12',
+            patch.active_date || '2026-10-10',
           ]
         );
         return this.get();
@@ -695,6 +719,182 @@ export const dbPlayers = {
     }
     const sb = getServiceSupabase();
     const { error } = await sb.from('players').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+};
+
+// ==========================================
+// 7. TOURNAMENT ARCHIVES REPOSITORY
+// ==========================================
+export const dbArchives = {
+  async ensureTable(): Promise<void> {
+    if (isMySQLDriver()) {
+      try {
+        await execute(`
+          CREATE TABLE IF NOT EXISTS \`tournament_archives\` (
+            \`id\` VARCHAR(36) NOT NULL,
+            \`name\` VARCHAR(255) NOT NULL,
+            \`category\` VARCHAR(10) NOT NULL DEFAULT 'U10',
+            \`match_date\` DATE DEFAULT NULL,
+            \`description\` TEXT DEFAULT NULL,
+            \`snapshot_data\` LONGTEXT NOT NULL,
+            \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (\`id\`),
+            KEY \`idx_archive_category\` (\`category\`),
+            KEY \`idx_archive_created\` (\`created_at\`)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+      } catch {
+        // Abaikan jika tabel sudah ada atau izin DDL terbatas
+      }
+    }
+  },
+
+  async getAll(): Promise<TournamentArchive[]> {
+    if (isMySQLDriver()) {
+      await this.ensureTable();
+      const rows = await query<any>(
+        "SELECT id, name, category, DATE_FORMAT(match_date, '%Y-%m-%d') as match_date, description, snapshot_data, created_at FROM tournament_archives ORDER BY created_at DESC"
+      );
+      return rows.map((r) => {
+        let snapshot = {} as any;
+        try {
+          snapshot = typeof r.snapshot_data === 'string' ? JSON.parse(r.snapshot_data) : r.snapshot_data;
+        } catch {}
+        return {
+          id: r.id,
+          name: r.name,
+          category: r.category,
+          match_date: r.match_date,
+          description: r.description,
+          snapshot_data: snapshot,
+          created_at: r.created_at,
+        };
+      });
+    }
+
+    if (!isSupabaseConfigured()) return [];
+    try {
+      const { data } = await supabase.from('tournament_archives').select('*').order('created_at', { ascending: false });
+      return ((data || []) as any[]).map((r) => ({
+        ...r,
+        snapshot_data: typeof r.snapshot_data === 'string' ? JSON.parse(r.snapshot_data) : r.snapshot_data,
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  async getById(id: string): Promise<TournamentArchive | null> {
+    if (isMySQLDriver()) {
+      await this.ensureTable();
+      const r = await queryOne<any>(
+        "SELECT id, name, category, DATE_FORMAT(match_date, '%Y-%m-%d') as match_date, description, snapshot_data, created_at FROM tournament_archives WHERE id = ?",
+        [id]
+      );
+      if (!r) return null;
+      let snapshot = {} as any;
+      try {
+        snapshot = typeof r.snapshot_data === 'string' ? JSON.parse(r.snapshot_data) : r.snapshot_data;
+      } catch {}
+      return {
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        match_date: r.match_date,
+        description: r.description,
+        snapshot_data: snapshot,
+        created_at: r.created_at,
+      };
+    }
+
+    if (!isSupabaseConfigured()) return null;
+    try {
+      const { data } = await supabase.from('tournament_archives').select('*').eq('id', id).maybeSingle();
+      if (!data) return null;
+      return {
+        ...data,
+        snapshot_data: typeof data.snapshot_data === 'string' ? JSON.parse(data.snapshot_data) : data.snapshot_data,
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async create(archive: {
+    id?: string;
+    name: string;
+    category: string;
+    match_date?: string | null;
+    description?: string | null;
+    snapshot_data: any;
+  }): Promise<TournamentArchive> {
+    const id = archive.id || crypto.randomUUID();
+    const snapshotStr = typeof archive.snapshot_data === 'string' ? archive.snapshot_data : JSON.stringify(archive.snapshot_data);
+
+    if (isMySQLDriver()) {
+      await this.ensureTable();
+      await execute(
+        'INSERT INTO tournament_archives (id, name, category, match_date, description, snapshot_data) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          id,
+          archive.name,
+          archive.category || 'U10',
+          archive.match_date || null,
+          archive.description || null,
+          snapshotStr,
+        ]
+      );
+      return (await this.getById(id))!;
+    }
+
+    const sb = getServiceSupabase();
+    const { data, error } = await sb.from('tournament_archives').insert({
+      id,
+      name: archive.name,
+      category: archive.category,
+      match_date: archive.match_date || null,
+      description: archive.description || null,
+      snapshot_data: archive.snapshot_data,
+    }).select().single();
+    if (error) throw error;
+    return data as TournamentArchive;
+  },
+
+  async update(id: string, patch: Partial<TournamentArchive>): Promise<TournamentArchive | null> {
+    if (isMySQLDriver()) {
+      await this.ensureTable();
+      const keys = Object.keys(patch).filter((k) => k !== 'id' && k !== 'created_at');
+      if (keys.length > 0) {
+        const setClause = keys.map((k) => `\`${k}\` = ?`).join(', ');
+        const values = keys.map((k) => {
+          if (k === 'snapshot_data') {
+            return typeof (patch as any)[k] === 'string' ? (patch as any)[k] : JSON.stringify((patch as any)[k]);
+          }
+          return (patch as any)[k];
+        });
+        values.push(id);
+        await execute(`UPDATE tournament_archives SET ${setClause} WHERE id = ?`, values);
+      }
+      return this.getById(id);
+    }
+
+    const sb = getServiceSupabase();
+    const { data, error } = await sb.from('tournament_archives').update(patch).eq('id', id).select().maybeSingle();
+    if (error) throw error;
+    return (data as TournamentArchive) || null;
+  },
+
+  async delete(id: string): Promise<boolean> {
+    if (isMySQLDriver()) {
+      await this.ensureTable();
+      const res = await execute('DELETE FROM tournament_archives WHERE id = ?', [id]);
+      return res.affectedRows > 0;
+    }
+
+    const sb = getServiceSupabase();
+    const { error } = await sb.from('tournament_archives').delete().eq('id', id);
     if (error) throw error;
     return true;
   },

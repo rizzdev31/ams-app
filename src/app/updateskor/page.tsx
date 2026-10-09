@@ -7,6 +7,7 @@ import MatchRow from '@/components/MatchRow';
 import EmptyState from '@/components/EmptyState';
 import MatchEventsManager from '@/components/MatchEventsManager';
 import MatchPamphletModal from '@/components/MatchPamphletModal';
+import Monogram from '@/components/Monogram';
 import { announceChangeEverywhere, matchesStore, useResource } from '@/lib/live-store';
 import { toast } from '@/components/Toast';
 
@@ -22,6 +23,9 @@ export default function UpdateSkorPage() {
   const [expandedEvents, setExpandedEvents] = useState<string[]>([]);
   const [lastUpdated, setLastUpdated] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
+  const [penaltyMatch, setPenaltyMatch] = useState<MatchWithTeams | null>(null);
+  const [penaltyScoreA, setPenaltyScoreA] = useState<number>(0);
+  const [penaltyScoreB, setPenaltyScoreB] = useState<number>(0);
 
   const loading = matches.length === 0 && !online;
 
@@ -85,6 +89,14 @@ export default function UpdateSkorPage() {
 
   const setStatus = (m: MatchWithTeams, status: MatchWithTeams['status']) => {
     if (status === 'finished') {
+      // Jika partai babak gugur seri, wajib adu penalti untuk menentukan pemenang
+      if (m.stage !== 'grup' && m.score_a === m.score_b) {
+        setPenaltyMatch(m);
+        setPenaltyScoreA(m.penalty_score_a ?? 0);
+        setPenaltyScoreB(m.penalty_score_b ?? 0);
+        return;
+      }
+
       const ok = window.confirm(
         `Akhiri ${m.team_a?.name ?? 'Tim A'} ${m.score_a}–${m.score_b} ${m.team_b?.name ?? 'Tim B'}? Skor akhir dikunci di klasemen.`
       );
@@ -96,6 +108,25 @@ export default function UpdateSkorPage() {
       toast.info('Waktu Istirahat (Halftime).');
     }
     update(m, { status });
+  };
+
+  const handleSavePenalty = async () => {
+    if (!penaltyMatch) return;
+    if (penaltyScoreA === penaltyScoreB) {
+      toast.error('Skor adu penalti tidak boleh imbang! Wajib ada pemenang.');
+      return;
+    }
+    const winnerName = penaltyScoreA > penaltyScoreB ? penaltyMatch.team_a?.name : penaltyMatch.team_b?.name;
+    const winnerId = penaltyScoreA > penaltyScoreB ? penaltyMatch.team_a_id : penaltyMatch.team_b_id;
+    await update(penaltyMatch, {
+      status: 'finished',
+      penalty_score_a: penaltyScoreA,
+      penalty_score_b: penaltyScoreB,
+      winner_team_id: winnerId,
+      notes: `Menang Adu Penalti ${penaltyScoreA}-${penaltyScoreB} (${winnerName})`,
+    });
+    setPenaltyMatch(null);
+    toast.success(`Adu penalti selesai! Pemenang: ${winnerName}`);
   };
 
   return (
@@ -257,6 +288,19 @@ export default function UpdateSkorPage() {
                     showCategory={Boolean(m.category)}
                   />
 
+                  {/* Banner Adu Penalti jika ada */}
+                  {m.penalty_score_a !== null && m.penalty_score_b !== null && (
+                    <div className="rounded-2xl border border-yellow/40 bg-yellow/10 p-2 text-center font-mono text-xs font-bold text-yellow flex items-center justify-between px-3">
+                      <span className="flex items-center gap-1.5">
+                        <span>⚽</span>
+                        <span>ADU PENALTI</span>
+                      </span>
+                      <span className="bg-ink/60 px-2 py-0.5 rounded border border-yellow/30">
+                        {m.team_a?.short_name ?? 'A'} {m.penalty_score_a} – {m.penalty_score_b} {m.team_b?.short_name ?? 'B'}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Accordion Pencatatan Gol & Kartu Wasit */}
                   <div className="rounded-2xl border border-line/80 bg-raise/30 overflow-hidden">
                     <button
@@ -289,6 +333,22 @@ export default function UpdateSkorPage() {
                         Skor akhir ({m.score_a}–{m.score_b}) terkunci. Jika terjadi salah klik &quot;Akhiri&quot; atau protes wasit, buka mode revisi.
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                        {/* Tombol Input Penalti Jika Babak Gugur Seri Belum Memiliki Penalti */}
+                        {m.stage !== 'grup' && m.score_a === m.score_b && m.penalty_score_a === null && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPenaltyMatch(m);
+                              setPenaltyScoreA(0);
+                              setPenaltyScoreB(0);
+                            }}
+                            className="label rounded-full border border-rose-500 bg-rose-500/20 px-3.5 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500/30 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm animate-pulse"
+                          >
+                            <span>⚽</span>
+                            <span>Wajib Input Adu Penalti!</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => setPamphletMatch(m)}
@@ -324,6 +384,22 @@ export default function UpdateSkorPage() {
                           <p className="text-[11px] text-muted">
                             Tombol skor di bawah kini aktif untuk koreksi. Anda juga dapat mengembalikan status ke babak berlangsung:
                           </p>
+
+                          {/* Tombol Khusus Koreksi Penalti di Babak Gugur */}
+                          {m.stage !== 'grup' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPenaltyMatch(m);
+                                setPenaltyScoreA(m.penalty_score_a ?? 0);
+                                setPenaltyScoreB(m.penalty_score_b ?? 0);
+                              }}
+                              className="label h-10 w-full rounded-xl border border-yellow/60 bg-yellow/20 text-xs font-bold text-yellow hover:bg-yellow/30 active:scale-95 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              <span>⚽</span>
+                              <span>{m.penalty_score_a !== null ? 'Koreksi Skor Adu Penalti' : 'Input Adu Penalti'}</span>
+                            </button>
+                          )}
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               type="button"
@@ -441,6 +517,146 @@ export default function UpdateSkorPage() {
           </div>
         )}
       </main>
+
+      {/* Modal Input Hasil Adu Penalti (Knockout Draw) */}
+      {penaltyMatch && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-reveal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Input Hasil Adu Penalti"
+        >
+          <div className="w-full max-w-md rounded-[28px] border-2 border-line bg-surface p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚽</span>
+                <div>
+                  <h3 className="font-display text-base sm:text-lg font-bold text-text">
+                    Hasil Adu Penalti
+                  </h3>
+                  <p className="text-[11px] text-muted">
+                    Partai gugur berakhir seri {penaltyMatch.score_a}–{penaltyMatch.score_b}. Tentukan pemenang!
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPenaltyMatch(null)}
+                className="h-8 w-8 rounded-full border border-line bg-raise text-muted hover:text-text flex items-center justify-center text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Score Grid Penalti */}
+            <div className="grid grid-cols-2 gap-3 py-2">
+              {/* TIM A */}
+              <div className="rounded-2xl border border-line bg-raise/40 p-3 flex flex-col items-center text-center">
+                <Monogram
+                  name={penaltyMatch.team_a?.name ?? 'Tim A'}
+                  shortName={penaltyMatch.team_a?.short_name}
+                  logoUrl={penaltyMatch.team_a?.logo_url}
+                  color={penaltyMatch.team_a?.color}
+                  size={36}
+                />
+                <span className="mt-1 font-display text-xs font-bold text-text truncate max-w-full">
+                  {penaltyMatch.team_a?.name ?? 'Tim A'}
+                </span>
+                <span className="font-mono text-4xl sm:text-5xl font-black text-text my-2">
+                  {penaltyScoreA}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPenaltyScoreA(Math.max(0, penaltyScoreA - 1))}
+                    disabled={penaltyScoreA === 0}
+                    className="h-10 w-10 rounded-xl border border-line bg-surface text-lg font-bold text-muted hover:text-text active:scale-95 disabled:opacity-30"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPenaltyScoreA(penaltyScoreA + 1)}
+                    className="h-10 w-10 rounded-xl bg-blue text-ink text-lg font-black active:scale-95"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* TIM B */}
+              <div className="rounded-2xl border border-line bg-raise/40 p-3 flex flex-col items-center text-center">
+                <Monogram
+                  name={penaltyMatch.team_b?.name ?? 'Tim B'}
+                  shortName={penaltyMatch.team_b?.short_name}
+                  logoUrl={penaltyMatch.team_b?.logo_url}
+                  color={penaltyMatch.team_b?.color}
+                  size={36}
+                />
+                <span className="mt-1 font-display text-xs font-bold text-text truncate max-w-full">
+                  {penaltyMatch.team_b?.name ?? 'Tim B'}
+                </span>
+                <span className="font-mono text-4xl sm:text-5xl font-black text-text my-2">
+                  {penaltyScoreB}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPenaltyScoreB(Math.max(0, penaltyScoreB - 1))}
+                    disabled={penaltyScoreB === 0}
+                    className="h-10 w-10 rounded-xl border border-line bg-surface text-lg font-bold text-muted hover:text-text active:scale-95 disabled:opacity-30"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPenaltyScoreB(penaltyScoreB + 1)}
+                    className="h-10 w-10 rounded-xl bg-blue text-ink text-lg font-black active:scale-95"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Pemenang Penalti */}
+            <div className="rounded-xl p-2.5 text-center text-xs font-bold">
+              {penaltyScoreA === penaltyScoreB ? (
+                <div className="text-yellow flex items-center justify-center gap-1.5 bg-yellow/10 py-1.5 rounded-lg border border-yellow/30">
+                  <span>⚠️</span>
+                  <span>Skor penalti tidak boleh imbang! Wajib ada pemenang.</span>
+                </div>
+              ) : (
+                <div className="text-emerald-400 flex items-center justify-center gap-1.5 bg-emerald-500/10 py-1.5 rounded-lg border border-emerald-500/30">
+                  <span>🏆</span>
+                  <span>
+                    Pemenang: {penaltyScoreA > penaltyScoreB ? penaltyMatch.team_a?.name : penaltyMatch.team_b?.name}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Tombol Aksi Simpan */}
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPenaltyMatch(null)}
+                className="label h-12 rounded-xl border border-line bg-surface text-xs font-bold text-muted hover:text-text active:scale-95"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePenalty}
+                disabled={penaltyScoreA === penaltyScoreB || Boolean(saving)}
+                className="label h-12 rounded-xl bg-blue text-ink text-xs font-bold shadow-md hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Menyimpan...' : 'Simpan & Akhiri ➜'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Pamflet Hasil Pertandingan */}
       <MatchPamphletModal

@@ -8,6 +8,7 @@ import type {
   Player,
   Sponsor,
   Team,
+  TournamentArchive,
 } from './types';
 import { SEED_MATCHES, SEED_SETTINGS, SEED_TEAMS } from './seed';
 
@@ -112,6 +113,7 @@ export const matchesStore = new Resource<MatchWithTeams[]>('/api/matches', SEED_
 export const teamsStore = new Resource<Team[]>('/api/teams', SEED_TEAMS);
 export const settingsStore = new Resource<EventSettings>('/api/settings', SEED_SETTINGS);
 export const sponsorsStore = new Resource<Sponsor[]>('/api/sponsors', []);
+export const archivesStore = new Resource<TournamentArchive[]>('/api/admin/archives', []);
 
 /**
  * Tab lain memberi tahu ada yang berubah (committee menyimpan,
@@ -130,6 +132,7 @@ if (channel) {
     void teamsStore.refresh();
     void settingsStore.refresh();
     void sponsorsStore.refresh();
+    void archivesStore.refresh();
   };
 }
 
@@ -142,6 +145,7 @@ if (typeof window !== 'undefined') {
       void teamsStore.refresh();
       void settingsStore.refresh();
       void sponsorsStore.refresh();
+      void archivesStore.refresh();
     }
   });
 }

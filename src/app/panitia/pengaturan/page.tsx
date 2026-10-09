@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { EventSettings, Sponsor, SponsorFormData, SponsorTier } from '@/lib/types';
+import type {
+  EventSettings,
+  Sponsor,
+  SponsorFormData,
+  SponsorTier,
+  TournamentArchive,
+  TournamentArchiveFormData,
+} from '@/lib/types';
 import { announceChangeEverywhere } from '@/lib/live-store';
 import { toast } from '@/components/Toast';
 
@@ -45,7 +52,7 @@ const TIER_META: Record<
 };
 
 export default function PengaturanPage() {
-  const [activeTab, setActiveTab] = useState<'general' | 'security' | 'sponsors' | 'danger'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'security' | 'archives' | 'sponsors' | 'danger'>('general');
 
   // General tournament settings state
   const [settings, setSettings] = useState<EventSettings | null>(null);
@@ -79,6 +86,24 @@ export default function PengaturanPage() {
   const [sponsorFormData, setSponsorFormData] = useState<SponsorFormData>(DEFAULT_SPONSOR_FORM);
   const [isSavingSponsor, setIsSavingSponsor] = useState(false);
   const [sponsorActionMessage, setSponsorActionMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  // Tournament archives & matchday focus state
+  const [archives, setArchives] = useState<TournamentArchive[]>([]);
+  const [isLoadingArchives, setIsLoadingArchives] = useState(false);
+  const [isSavingFocus, setIsSavingFocus] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [editingArchive, setEditingArchive] = useState<TournamentArchive | null>(null);
+  const [archiveFormData, setArchiveFormData] = useState<TournamentArchiveFormData>({
+    name: '',
+    category: 'U10',
+    match_date: '2026-10-09',
+    description: '',
+  });
+  const [isSavingArchive, setIsSavingArchive] = useState(false);
+  const [archiveActionMessage, setArchiveActionMessage] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
@@ -184,10 +209,174 @@ export default function PengaturanPage() {
     }
   };
 
+  const fetchArchives = async () => {
+    setIsLoadingArchives(true);
+    try {
+      const res = await fetch('/api/admin/archives', { cache: 'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (data.success && Array.isArray(data.data)) {
+        setArchives(data.data);
+      }
+    } catch (err) {
+      console.error('Gagal memuat arsip turnamen:', err);
+    } finally {
+      setIsLoadingArchives(false);
+    }
+  };
+
   useEffect(() => {
     void fetchSettings();
     void fetchSponsors();
+    void fetchArchives();
   }, []);
+
+  const handleSaveFocus = async (cat: string, date: string) => {
+    if (!settings) return;
+    setIsSavingFocus(true);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          active_category: cat,
+          active_date: date,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setSettings((prev) => (prev ? { ...prev, active_category: cat, active_date: date } : null));
+        announceChangeEverywhere();
+        toast.success(`Fokus turnamen berhasil diubah ke ${cat === 'Semua' ? 'Semua Kategori' : cat} (${date})!`);
+      } else {
+        toast.error(data.error || 'Gagal menyimpan fokus turnamen.');
+      }
+    } catch {
+      toast.error('Koneksi gagal saat mengubah fokus turnamen.');
+    } finally {
+      setIsSavingFocus(false);
+    }
+  };
+
+  const handleQuickArchiveU10 = async () => {
+    setIsSavingArchive(true);
+    try {
+      const res = await fetch('/api/admin/archives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Arsip Pertandingan U-10 (Selesai Hari 1)',
+          category: 'U10',
+          match_date: '2026-10-09',
+          description: 'Container arsip resmi hasil pertandingan dan klasemen akhir kategori U-10 Hari 1 (9 Oktober 2026).',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        await fetchArchives();
+        announceChangeEverywhere();
+        toast.success('Container arsip U-10 berhasil dibuat dan disimpan!');
+      } else {
+        toast.error(data.error || 'Gagal membuat arsip U-10.');
+      }
+    } catch {
+      toast.error('Koneksi gagal saat membuat arsip.');
+    } finally {
+      setIsSavingArchive(false);
+    }
+  };
+
+  const openAddArchiveModal = () => {
+    setEditingArchive(null);
+    setArchiveFormData({
+      name: '',
+      category: (settings?.active_category as any) || 'U10',
+      match_date: settings?.active_date || '2026-10-09',
+      description: '',
+    });
+    setArchiveActionMessage(null);
+    setIsArchiveModalOpen(true);
+  };
+
+  const openEditArchiveModal = (arc: TournamentArchive) => {
+    setEditingArchive(arc);
+    setArchiveFormData({
+      name: arc.name,
+      category: arc.category,
+      match_date: arc.match_date || '',
+      description: arc.description || '',
+    });
+    setArchiveActionMessage(null);
+    setIsArchiveModalOpen(true);
+  };
+
+  const closeArchiveModal = () => {
+    setIsArchiveModalOpen(false);
+    setEditingArchive(null);
+    setArchiveActionMessage(null);
+  };
+
+  const handleArchiveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!archiveFormData.name.trim()) {
+      setArchiveActionMessage({ type: 'error', text: 'Nama container arsip wajib diisi.' });
+      return;
+    }
+    setIsSavingArchive(true);
+    try {
+      let res: Response;
+      if (editingArchive) {
+        res = await fetch('/api/admin/archives', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingArchive.id,
+            name: archiveFormData.name,
+            description: archiveFormData.description,
+          }),
+        });
+      } else {
+        res = await fetch('/api/admin/archives', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(archiveFormData),
+        });
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        await fetchArchives();
+        announceChangeEverywhere();
+        closeArchiveModal();
+        toast.success(editingArchive ? 'Container arsip berhasil diperbarui!' : 'Container arsip baru berhasil dibuat!');
+      } else {
+        setArchiveActionMessage({ type: 'error', text: data.error || 'Gagal menyimpan arsip.' });
+        toast.error(data.error || 'Gagal menyimpan arsip.');
+      }
+    } catch {
+      setArchiveActionMessage({ type: 'error', text: 'Koneksi gagal saat menyimpan arsip.' });
+      toast.error('Koneksi gagal saat menyimpan arsip.');
+    } finally {
+      setIsSavingArchive(false);
+    }
+  };
+
+  const handleDeleteArchive = async (arc: TournamentArchive) => {
+    const confirmed = window.confirm(
+      `Hapus container arsip "${arc.name}"?\nData snapshot tersimpan untuk container ini akan dihapus.`
+    );
+    if (!confirmed) return;
+    try {
+      const res = await fetch(`/api/admin/archives?id=${arc.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setArchives((prev) => prev.filter((a) => a.id !== arc.id));
+        announceChangeEverywhere();
+        toast.success(`Container "${arc.name}" berhasil dihapus.`);
+      } else {
+        toast.error('Gagal menghapus container arsip.');
+      }
+    } catch {
+      toast.error('Koneksi gagal saat menghapus container arsip.');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,6 +394,8 @@ export default function PengaturanPage() {
       rules_text: settings.rules_text,
       tiebreak_rules: settings.tiebreak_rules,
       contact_info: settings.contact_info,
+      active_category: settings.active_category,
+      active_date: settings.active_date,
     };
 
     try {
@@ -545,6 +736,31 @@ export default function PengaturanPage() {
             }`}
           >
             <span>🛡️ Keamanan & Sandi Lapangan</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'archives'}
+            onClick={() => {
+              setActiveTab('archives');
+              fetchArchives();
+            }}
+            className={`label flex-1 sm:flex-none px-4 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all ${
+              activeTab === 'archives'
+                ? 'bg-text text-ink shadow-sm'
+                : 'text-muted hover:text-text'
+            }`}
+          >
+            <span>📦 Container Arsip & Fokus Hari</span>
+            <span
+              className={`ml-2 px-2 py-0.5 rounded-full text-[11px] ${
+                activeTab === 'archives'
+                  ? 'bg-ink/20 text-ink'
+                  : 'bg-raise text-muted'
+              }`}
+            >
+              {archives.length}
+            </span>
           </button>
           <button
             type="button"
@@ -1126,6 +1342,279 @@ export default function PengaturanPage() {
         </div>
       )}
 
+      {/* ================= TAB: CONTAINER ARSIP & FOKUS HARI ================= */}
+      {activeTab === 'archives' && (
+        <div className="space-y-6">
+          {/* Card 1: Pengaturan Fokus Matchday (Besok U-12) */}
+          <div className="rounded-3xl border border-line bg-surface p-6 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 font-bold uppercase tracking-wider mb-1">
+                  <span>🎯</span>
+                  <span>FOKUS MATCHDAY BERANDA & PANITIA</span>
+                </div>
+                <h2 className="font-display text-xl font-black text-text">
+                  Kategori & Hari Pertandingan Aktif
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  Tentukan kategori dan tanggal yang langsung menjadi fokus saat pengunjung membuka beranda atau panitia membuka konsol skor.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted font-mono">Fokus Saat Ini:</span>
+                <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-bold text-xs">
+                  {settings.active_category || 'U12'} ({settings.active_date || '2026-10-10'})
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Switch Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Option 1: U-12 (Besok / Hari 2) */}
+              <button
+                type="button"
+                onClick={() => handleSaveFocus('U12', '2026-10-10')}
+                disabled={isSavingFocus}
+                className={`p-4 rounded-2xl border text-left transition-all ${
+                  (settings.active_category === 'U12' || !settings.active_category) &&
+                  settings.active_date === '2026-10-10'
+                    ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30'
+                    : 'border-line bg-raise/40 hover:bg-raise hover:border-line'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-emerald-400 uppercase">
+                    🔥 REKOMENDASI BESOK
+                  </span>
+                  {settings.active_category === 'U12' && (
+                    <span className="text-xs text-emerald-400 font-bold">✓ Aktif</span>
+                  )}
+                </div>
+                <h3 className="font-display font-extrabold text-base text-text mt-1">
+                  Kategori U-12 (Hari 2)
+                </h3>
+                <p className="text-[11px] text-muted mt-1 leading-snug">
+                  Fokus penuh pada turnamen U-12 tanggal 10 Oktober 2026. Data U-10 akan tersimpan rapi di container arsip.
+                </p>
+                <div className="mt-3">
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-mono text-[11px] font-bold">
+                    Terapkan U-12 (10 Okt) ➔
+                  </span>
+                </div>
+              </button>
+
+              {/* Option 2: U-10 (Hari 1) */}
+              <button
+                type="button"
+                onClick={() => handleSaveFocus('U10', '2026-10-09')}
+                disabled={isSavingFocus}
+                className={`p-4 rounded-2xl border text-left transition-all ${
+                  settings.active_category === 'U10' && settings.active_date === '2026-10-09'
+                    ? 'border-blue bg-blue/10 ring-2 ring-blue/30'
+                    : 'border-line bg-raise/40 hover:bg-raise hover:border-line'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-blue uppercase">HARI 1</span>
+                  {settings.active_category === 'U10' && (
+                    <span className="text-xs text-blue font-bold">✓ Aktif</span>
+                  )}
+                </div>
+                <h3 className="font-display font-extrabold text-base text-text mt-1">
+                  Kategori U-10 (Hari 1)
+                </h3>
+                <p className="text-[11px] text-muted mt-1 leading-snug">
+                  Tampilkan jadwal dan skor kategori U-10 tanggal 9 Oktober 2026 sebagai fokus utama.
+                </p>
+                <div className="mt-3">
+                  <span className="px-2.5 py-1 rounded-lg bg-blue/20 text-blue font-mono text-[11px] font-bold">
+                    Terapkan U-10 (9 Okt) ➔
+                  </span>
+                </div>
+              </button>
+
+              {/* Option 3: Semua Kategori */}
+              <button
+                type="button"
+                onClick={() => handleSaveFocus('Semua', '2026-10-10')}
+                disabled={isSavingFocus}
+                className={`p-4 rounded-2xl border text-left transition-all ${
+                  settings.active_category === 'Semua'
+                    ? 'border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/30'
+                    : 'border-line bg-raise/40 hover:bg-raise hover:border-line'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase">
+                    SEMUA USIA
+                  </span>
+                  {settings.active_category === 'Semua' && (
+                    <span className="text-xs text-amber-400 font-bold">✓ Aktif</span>
+                  )}
+                </div>
+                <h3 className="font-display font-extrabold text-base text-text mt-1">
+                  Tampilkan Semua
+                </h3>
+                <p className="text-[11px] text-muted mt-1 leading-snug">
+                  Tidak membatasi filter usia default pada dashboard publik dan konsol skor panitia.
+                </p>
+                <div className="mt-3">
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold">
+                    Terapkan Semua ➔
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Container Arsip Turnamen Selesai */}
+          <div className="rounded-3xl border border-line bg-surface p-6 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-4">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-mono text-amber-400 font-bold uppercase tracking-wider mb-1">
+                  <span>📦</span>
+                  <span>CONTAINER ARSIP HASIL PERTANDINGAN</span>
+                </div>
+                <h2 className="font-display text-xl font-black text-text">
+                  Daftar Container Arsip Tersimpan
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  Akumulasi data kategori pertandingan yang telah selesai dibekukan dalam container arsip dengan nama kustom, sehingga data tetap aman dan dapat diakses publik.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {archives.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={handleQuickArchiveU10}
+                    disabled={isSavingArchive}
+                    className="label inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold hover:bg-emerald-500/30 transition-all shadow-sm"
+                  >
+                    <span>⚡</span>
+                    <span>Arsipkan U-10 Otomatis</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={openAddArchiveModal}
+                  className="label inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-blue text-ink text-xs font-bold hover:opacity-90 transition-all shadow-sm"
+                >
+                  <span>➕</span>
+                  <span>Buat Container Baru</span>
+                </button>
+              </div>
+            </div>
+
+            {/* List Containers */}
+            {isLoadingArchives ? (
+              <div className="flex justify-center py-10">
+                <div className="w-7 h-7 border-3 border-blue border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : archives.length === 0 ? (
+              <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-line bg-raise/20">
+                <span className="text-4xl">📦</span>
+                <h3 className="font-display font-bold text-base text-text mt-2">
+                  Belum Ada Container Arsip Manual yang Dibuat
+                </h3>
+                <p className="text-xs text-muted max-w-md mx-auto mt-1">
+                  Sistem saat ini otomatis menyediakan fallback container U-10 di beranda publik. Anda dapat membuat container arsip dengan nama kustom sekarang agar tersimpan permanen di database.
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleQuickArchiveU10}
+                    disabled={isSavingArchive}
+                    className="label inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-emerald-500 text-ink text-xs font-bold hover:opacity-90 transition-all shadow-sm"
+                  >
+                    <span>⚡ Buat Container Arsip U-10 Sekarang</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {archives.map((arc) => {
+                  const snap = arc.snapshot_data;
+                  return (
+                    <div
+                      key={arc.id}
+                      className="rounded-2xl border border-line bg-raise/30 p-5 flex flex-col justify-between hover:border-amber-400/40 transition-all group"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold uppercase border border-amber-500/30">
+                            {arc.category} • {arc.match_date}
+                          </span>
+                          <span className="text-[10px] text-muted font-mono">
+                            Dibuat: {new Date(arc.created_at).toLocaleDateString('id-ID')}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h4 className="font-display font-black text-base text-text group-hover:text-amber-300 transition-colors">
+                            {arc.name}
+                          </h4>
+                          {arc.description && (
+                            <p className="text-xs text-muted mt-1 leading-relaxed">
+                              {arc.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Ringkasan Snapshot Data */}
+                        <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-surface/80 border border-line text-center text-xs font-mono">
+                          <div>
+                            <span className="text-[10px] text-muted block">Total Tim</span>
+                            <strong className="text-text font-bold">
+                              {snap?.total_teams ?? '–'}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-muted block">Laga Selesai</span>
+                            <strong className="text-emerald-400 font-bold">
+                              {snap?.finished_matches ?? '–'}/{snap?.total_matches ?? '–'}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-muted block">Juara 1</span>
+                            <strong className="text-amber-300 font-bold truncate block">
+                              {snap?.champion_name || '–'}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-line/60 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-muted font-mono">
+                          Status: <span className="text-emerald-400 font-semibold">Tersimpan di DB</span>
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditArchiveModal(arc)}
+                            className="label px-3 py-1.5 rounded-full border border-line bg-surface text-xs font-semibold text-text hover:border-amber-400 hover:text-amber-300 transition-colors"
+                          >
+                            ✏️ Ubah Nama
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteArchive(arc)}
+                            className="label px-3 py-1.5 rounded-full border border-danger/30 bg-danger/10 text-xs font-semibold text-danger hover:bg-danger/20 transition-colors"
+                          >
+                            🗑️ Hapus
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ================= TAB 3: SPONSORSHIP & PARTNER ================= */}
       {activeTab === 'sponsors' && (
         <div className="space-y-6">
@@ -1556,6 +2045,141 @@ export default function PengaturanPage() {
                     <div className="w-4 h-4 border-2 border-ink border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <span>{editingSponsor ? 'Simpan Perubahan' : 'Tambahkan Sponsor'}</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL TAMBAH / UBAH CONTAINER ARSIP ================= */}
+      {isArchiveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[28px] border border-line bg-surface shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
+              <h2 className="font-display text-xl font-extrabold text-text">
+                {editingArchive ? 'Ubah Container Arsip' : 'Buat Container Arsip Baru'}
+              </h2>
+              <button
+                type="button"
+                onClick={closeArchiveModal}
+                className="label h-8 w-8 rounded-full border border-line flex items-center justify-center text-muted hover:text-text hover:border-text transition-colors"
+                aria-label="Tutup modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleArchiveSubmit} className="space-y-5 p-6">
+              {archiveActionMessage && (
+                <div
+                  className={`p-3.5 rounded-2xl text-xs sm:text-sm font-semibold ${
+                    archiveActionMessage.type === 'success'
+                      ? 'bg-blue/10 text-blue border border-blue/40'
+                      : 'bg-danger/10 text-danger border border-danger/40'
+                  }`}
+                >
+                  {archiveActionMessage.text}
+                </div>
+              )}
+
+              {/* Custom Nama Container */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+                  Nama Kustom Container Arsip *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Arsip Pertandingan U-10 (Selesai Hari 1)"
+                  value={archiveFormData.name}
+                  onChange={(e) =>
+                    setArchiveFormData({ ...archiveFormData, name: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-line bg-surface rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none text-text text-sm"
+                />
+                <p className="text-[11px] text-muted mt-1">
+                  Nama ini akan ditampilkan sebagai judul container di beranda publik.
+                </p>
+              </div>
+
+              {/* Kategori & Tanggal (hanya bisa diubah saat pembuatan baru) */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+                    Kategori Usia
+                  </label>
+                  <select
+                    disabled={!!editingArchive}
+                    value={archiveFormData.category}
+                    onChange={(e) =>
+                      setArchiveFormData({ ...archiveFormData, category: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 border border-line bg-surface rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none text-text text-sm disabled:opacity-60"
+                  >
+                    <option value="U10">U-10 (Usia 10)</option>
+                    <option value="U12">U-12 (Usia 12)</option>
+                    <option value="Semua">Semua Kategori</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+                    Tanggal Pertandingan
+                  </label>
+                  <input
+                    type="date"
+                    disabled={!!editingArchive}
+                    value={archiveFormData.match_date}
+                    onChange={(e) =>
+                      setArchiveFormData({ ...archiveFormData, match_date: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 border border-line bg-surface rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none text-text text-sm disabled:opacity-60 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Deskripsi */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+                  Catatan / Deskripsi Tambahan
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Catatan turnamen: Seluruh laga U-10 telah diselesaikan, juara diraih oleh..."
+                  value={archiveFormData.description}
+                  onChange={(e) =>
+                    setArchiveFormData({ ...archiveFormData, description: e.target.value })
+                  }
+                  className="w-full px-4 py-2.5 border border-line bg-surface rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none text-text text-sm"
+                />
+              </div>
+
+              {!editingArchive && (
+                <div className="rounded-xl border border-blue/20 bg-blue/5 p-3 text-xs text-muted leading-relaxed">
+                  💡 <strong className="text-text">Snapshot Otomatis:</strong> Saat container disimpan, sistem akan secara otomatis mengumpulkan seluruh skor laga, klasemen grup, dan bracket bagan gugur untuk kategori ini dan membekukannya.
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="pt-3 border-t border-line flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={closeArchiveModal}
+                  className="px-5 py-2.5 rounded-full border border-line text-xs font-semibold text-text hover:bg-raise transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingArchive}
+                  className="px-6 py-2.5 rounded-full bg-amber-400 text-ink font-bold text-xs hover:brightness-110 transition-opacity flex items-center gap-2 shadow-sm"
+                >
+                  {isSavingArchive ? (
+                    <div className="w-4 h-4 border-2 border-ink border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <span>{editingArchive ? 'Simpan Perubahan' : 'Bekukan & Buat Container'}</span>
                   )}
                 </button>
               </div>

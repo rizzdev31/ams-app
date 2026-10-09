@@ -2,18 +2,29 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import type { MatchWithTeams, MatchEvent, Sponsor } from '@/lib/types';
-import { formatShortDate, formatTime, todayWIB, getMatchPartai } from '@/lib/utils';
+import type { MatchWithTeams, MatchEvent, Sponsor, TournamentArchive, StandingRow } from '@/lib/types';
+import { formatShortDate, formatTime, todayWIB, getMatchPartai, calculateStandings } from '@/lib/utils';
+import { buildTournamentBracket } from '@/lib/bracket';
 import { useCategory } from '@/hooks/useCategory';
-import { matchesStore, teamsStore, sponsorsStore, useResource } from '@/lib/live-store';
+import {
+  matchesStore,
+  teamsStore,
+  sponsorsStore,
+  archivesStore,
+  settingsStore,
+  useResource,
+} from '@/lib/live-store';
 import Monogram from '@/components/Monogram';
 import MatchDetailModal from '@/components/MatchDetailModal';
 import MatchPamphletModal from '@/components/MatchPamphletModal';
+import TournamentArchiveContainer from '@/components/TournamentArchiveContainer';
 
 export default function DashboardPage() {
   const [matches, online] = useResource(matchesStore);
   const [teams] = useResource(teamsStore);
   const [sponsors] = useResource(sponsorsStore);
+  const [archives] = useResource(archivesStore);
+  const [settings] = useResource(settingsStore);
   const [category, setCategory] = useCategory();
 
   // State filter jadwal hari ini di dashboard
@@ -45,15 +56,111 @@ export default function DashboardPage() {
     return list.length > 0 ? list : ['2026-10-09', '2026-10-10'];
   }, [matches]);
 
-  // Set tanggal aktif default: jika hari ini ada di turnamen pakai hari ini, jika tidak pakai hari pertama
+  // Set fokus kategori & tanggal turnamen otomatis dari settings jika ada (misal U-12 besok)
   useEffect(() => {
-    const today = todayWIB();
-    if (tournamentDates.includes(today)) {
-      setActiveDate(today);
-    } else if (tournamentDates.length > 0 && !activeDate) {
-      setActiveDate(tournamentDates[0]);
+    if (settings?.active_category) {
+      const userChose = typeof window !== 'undefined' ? window.sessionStorage.getItem('annur-user-chose-category') : null;
+      if (!userChose) {
+        setCategory(settings.active_category);
+      }
     }
-  }, [tournamentDates, activeDate]);
+    if (settings?.active_date) {
+      const userChoseDate = typeof window !== 'undefined' ? window.sessionStorage.getItem('annur-user-chose-date') : null;
+      if (!userChoseDate) {
+        setActiveDate(settings.active_date);
+      }
+    } else if (!activeDate) {
+      const today = todayWIB();
+      if (tournamentDates.includes(today)) {
+        setActiveDate(today);
+      } else if (tournamentDates.length > 0) {
+        setActiveDate(tournamentDates[0]);
+      }
+    }
+  }, [settings, tournamentDates, activeDate, setCategory]);
+
+  // Kumpulkan data container arsip (dari database archivesStore atau auto-fallback U-10)
+  const displayArchives = useMemo<TournamentArchive[]>(() => {
+    if (archives.length > 0) return archives;
+
+    // Fallback: auto-container untuk U-10 jika belum ada container yang disimpan superadmin
+    const u10Matches = matches.filter((m) => (m.category ?? 'U10') === 'U10');
+    if (u10Matches.length === 0) return [];
+
+    const u10Teams = teams.filter((t) => (t.category ?? 'U10') === 'U10');
+    const groupStandings: Record<string, StandingRow[]> = {};
+    for (const g of ['A', 'B', 'C', 'D']) {
+      groupStandings[g] = calculateStandings(u10Teams, u10Matches, g);
+    }
+
+    let champName: string | null = null;
+    let runnerName: string | null = null;
+    let thirdName: string | null = null;
+    let fourthName: string | null = null;
+    let bracketSummary = undefined;
+
+    try {
+      const b = buildTournamentBracket('U10', u10Teams, u10Matches);
+      champName = b.finalMatch.winnerTeam?.name ?? null;
+      runnerName = b.finalMatch.loserTeam?.name ?? null;
+      thirdName = b.thirdPlaceMatch.winnerTeam?.name ?? null;
+      fourthName = b.thirdPlaceMatch.loserTeam?.name ?? null;
+      bracketSummary = {
+        qf: b.quarterfinals.map((q) => ({
+          code: q.code,
+          title: q.title,
+          score: q.match ? `${q.match.score_a}–${q.match.score_b}` : '–',
+          winner: q.winnerTeam?.name,
+          byPenalty: q.byPenalty,
+        })),
+        sf: b.semifinals.map((s) => ({
+          code: s.code,
+          title: s.title,
+          score: s.match ? `${s.match.score_a}–${s.match.score_b}` : '–',
+          winner: s.winnerTeam?.name,
+          byPenalty: s.byPenalty,
+        })),
+        final: {
+          title: b.finalMatch.title,
+          score: b.finalMatch.match ? `${b.finalMatch.match.score_a}–${b.finalMatch.match.score_b}` : '–',
+          winner: b.finalMatch.winnerTeam?.name,
+          byPenalty: b.finalMatch.byPenalty,
+        },
+        third_place: {
+          title: b.thirdPlaceMatch.title,
+          score: b.thirdPlaceMatch.match ? `${b.thirdPlaceMatch.match.score_a}–${b.thirdPlaceMatch.match.score_b}` : '–',
+          winner: b.thirdPlaceMatch.winnerTeam?.name,
+          byPenalty: b.thirdPlaceMatch.byPenalty,
+        },
+      };
+    } catch {}
+
+    return [
+      {
+        id: 'auto-u10-container',
+        name: 'Arsip Pertandingan U-10 (Selesai Hari 1)',
+        category: 'U10',
+        match_date: '2026-10-09',
+        description: 'Akumulasi seluruh hasil pertandingan dan klasemen akhir kategori U-10.',
+        created_at: new Date().toISOString(),
+        snapshot_data: {
+          archived_at: new Date().toISOString(),
+          category: 'U10',
+          total_teams: u10Teams.length,
+          total_matches: u10Matches.length,
+          finished_matches: u10Matches.filter((m) => m.status === 'finished').length,
+          champion_name: champName,
+          runner_up_name: runnerName,
+          third_place_name: thirdName,
+          fourth_place_name: fourthName,
+          teams: u10Teams,
+          matches: u10Matches,
+          group_standings: groupStandings,
+          bracket_summary: bracketSummary,
+        },
+      },
+    ];
+  }, [archives, matches, teams]);
 
   // Filter pertandingan untuk section Jadwal Hari Ini
   const todayMatches = useMemo(() => {
@@ -229,6 +336,20 @@ export default function DashboardPage() {
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
               Pantau jadwal kickoff, skor live, dan hasil akhir pertandingan terkini
             </p>
+            {settings?.active_category && (
+              <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-500/15 to-cyan-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono shadow-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>
+                  Fokus Matchday Hari Ini:{' '}
+                  <strong className="text-white font-bold underline decoration-emerald-400 underline-offset-2">
+                    {settings.active_category === 'U12' ? 'Kategori U-12' : settings.active_category}
+                  </strong>
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Quick Date Switcher (Hari 1 & Hari 2) */}
@@ -496,6 +617,11 @@ export default function DashboardPage() {
           </Link>
         </div>
       </section>
+
+      {/* ============================================================== */}
+      {/* SECTION CONTAINER ARSIP PERTANDINGAN SELESAI (U-10, DLL)      */}
+      {/* ============================================================== */}
+      <TournamentArchiveContainer archives={displayArchives} />
 
       {/* ============================================================== */}
       {/* SECTION 4: 2 CARD VIDEO (FUTURISTIC VIDEO HIGHLIGHTS)          */}
