@@ -253,4 +253,46 @@ describe('Logika Bagan Babak Gugur (Bracket Logic)', () => {
     expect(issues.some((i) => i.code === 'DRAW_UNRESOLVED_KNOCKOUT')).toBe(true);
     expect(issues.some((i) => i.code === 'FIELD_TIME_CONFLICT')).toBe(true);
   });
+
+  it('menangani tim yang mengundurkan diri sehingga laga grup berkurang dan tetap mendeteksi grup selesai', () => {
+    // Skenario: 1 tim di grup A mengundurkan diri, hanya tersisa 2 tim (1 laga) yang dimainkan dan selesai
+    const teamsWithDropout: Team[] = [
+      { id: 't-a1', name: 'TPA', short_name: 'TPA', group_name: 'A', category: 'U10', logo_url: null, color: null, created_at: '' },
+      { id: 't-a2', name: 'Singoloyo', short_name: 'SGL', group_name: 'A', category: 'U10', logo_url: null, color: null, created_at: '' },
+      ...mockTeamsU10.slice(2),
+    ];
+
+    // Semua grup memiliki laga selesai
+    const leaders = getGroupLeaders('U10', teamsWithDropout, mockMatchesU10);
+    expect(leaders.get('A')?.complete).toBe(true);
+    expect(leaders.get('A')?.winner?.name).toBe('TPA');
+    expect(leaders.get('A')?.runnerUp?.name).toBe('Singoloyo');
+
+    const bracket = buildTournamentBracket('U10', teamsWithDropout, mockMatchesU10);
+    expect(bracket.isGroupStageComplete).toBe(true);
+    expect(bracket.quarterfinals[0].homeSlot.team?.name).toBe('TPA');
+  });
+
+  it('mencocokkan laga gugur berdasarkan kode node unik meskipun jam kickoff digeser oleh panitia', () => {
+    // Skenario: Pertandingan AA di database jamnya molor menjadi 14:25 di Lapangan 2 (berbeda dari jadwal default 14:00 di Lap 1)
+    const shiftedKnockoutMatches: MatchWithTeams[] = [
+      ...mockMatchesU10,
+      {
+        id: 'qf-1-shifted', team_a_id: 't-a1', team_b_id: 't-b2', score_a: 2, score_b: 1, status: 'finished',
+        stage: 'perempat_final', group_name: 'AA', category: 'U10', match_date: '2026-10-09',
+        kickoff_time: '14:25', field: '2', updated_at: '',
+        team_a: mockTeamsU10[0], team_b: mockTeamsU10[3],
+      },
+    ];
+
+    const bracket = buildTournamentBracket('U10', mockTeamsU10, shiftedKnockoutMatches);
+    const qf1 = bracket.quarterfinals[0];
+    // Laga harus tetap terhubung ke node AA
+    expect(qf1.match).not.toBeNull();
+    expect(qf1.match?.id).toBe('qf-1-shifted');
+    // Waktu dan lapangan harus mencerminkan jam aktual database
+    expect(qf1.kickoff_time).toBe('14:25');
+    expect(qf1.field).toBe('2');
+    expect(qf1.winnerTeam?.name).toBe('TPA');
+  });
 });

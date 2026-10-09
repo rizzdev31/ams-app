@@ -172,9 +172,8 @@ export function useResource<T>(store: Resource<T>): [T, boolean, () => void] {
 
     sync();
     const unsubscribe = store.subscribe(sync);
-    // Indikator "koneksi terputus" dicek terpisah supaya tidak bergantung
-    // pada kapan data terakhir benar-benar berubah.
-    const clock = setInterval(sync, 3_000);
+    // Indikator "koneksi terputus" dicek berkala secara efisien
+    const clock = setInterval(sync, 10_000);
 
     return () => {
       alive.current = false;

@@ -14,15 +14,60 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
+ * Handler GET: Pratinjau (Preview) Struktur & Distribusi Babak Gugur sebelum disimpan ke DB.
+ * Membantu panitia memantau siapa yang lolos dan melihat partai yang sudah/belum terjadwal.
+ */
+export async function GET(request: Request) {
+  try {
+    const session = await requireAdmin();
+    if (!session) {
+      return NextResponse.json({ success: false, error: 'Sesi berakhir, masuk kembali.' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const rawCategory = searchParams.get('category')?.trim().toUpperCase() || 'U10';
+    const category = rawCategory === 'U12' ? 'U12' : 'U10';
+
+    const [allTeams, allMatches] = await Promise.all([
+      dbTeams.getAll(),
+      dbMatches.getAll({ category }),
+    ]);
+
+    const teams = allTeams.filter((t) => t.category === category);
+    const matches = allMatches;
+
+    const bracket = buildTournamentBracket(category, teams, matches);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        category,
+        isGroupStageComplete: bracket.isGroupStageComplete,
+        quarterfinals: bracket.quarterfinals,
+        semifinals: bracket.semifinals,
+        finalMatch: bracket.finalMatch,
+        thirdPlaceMatch: bracket.thirdPlaceMatch,
+        unresolvedDrawMatches: bracket.unresolvedDrawMatches,
+        teams,
+      },
+    });
+  } catch (error: unknown) {
+    console.error('Bracket preview error:', error);
+    const err = error as { message?: string };
+    return NextResponse.json({ success: false, error: err?.message || 'Gagal memuat pratinjau bagan' }, { status: 500 });
+  }
+}
+
+/**
  * Endpoint Sinkronisasi & Penyesuaian Fleksibel Babak Gugur (Knockout).
  * Membaca klasemen grup dan hasil pertandingan gugur sebelumnya, lalu
  * membuat atau memperbarui jadwal babak perempat final, semifinal, dan final.
  * 
  * Mendukung opsi:
  * - category: 'U10' | 'U12'
- * - groupOverrides: { [grp]: { winnerId, runnerUpId } } (misal untuk tiebreak koin-toss)
- * - slotOverrides: { [nodeCode]: { homeTeamId, awayTeamId } } (intervensi superadmin)
- * - force: boolean (tetap update meskipun status pertandingan sudah terjadwal)
+ * - groupOverrides: { [grp]: { winnerId, runnerUpId } } (misal untuk tiebreak koin-toss atau tim mundur)
+ * - slotOverrides: { [nodeCode]: { homeTeamId, awayTeamId } } (intervensi panitia / redistribusi pemenang)
+ * - force: boolean (tetap update meskipun status pertandingan sudah selesai)
  */
 export async function POST(request: Request) {
   try {
@@ -90,13 +135,33 @@ export async function POST(request: Request) {
         continue;
       }
 
-      // Cek apakah pertandingan untuk stage, jam, dan lapangan ini sudah ada di DB
-      const existing = matches.find(
-        (m) =>
-          m.stage === node.stage &&
-          m.field === node.field &&
-          m.kickoff_time.slice(0, 5) === node.kickoff_time.slice(0, 5)
-      );
+      // Cek apakah pertandingan untuk partai ini sudah ada di DB
+      // 1. Prioritaskan kecocokan berdasarkan stage dan kode partai unik (group_name: AA, BB, CC, DD, EE, FF, FINAL, JUARA_3 atau alias U12)
+      let existing = matches.find((m) => {
+        if (m.stage !== node.stage) return false;
+        if (!m.group_name) return false;
+        const gn = m.group_name.trim();
+        if (gn === node.code) return true;
+        if (node.code === 'AA' && gn === 'WW') return true;
+        if (node.code === 'BB' && gn === 'XX') return true;
+        if (node.code === 'CC' && gn === 'YY') return true;
+        if (node.code === 'DD' && gn === 'ZZ') return true;
+        if (node.code === 'WW' && gn === 'AA') return true;
+        if (node.code === 'XX' && gn === 'BB') return true;
+        if (node.code === 'YY' && gn === 'CC') return true;
+        if (node.code === 'ZZ' && gn === 'DD') return true;
+        return false;
+      });
+
+      // 2. Fallback: jika partai lama belum memiliki kode group_name, cocokkan stage + field + kickoff_time
+      if (!existing) {
+        existing = matches.find(
+          (m) =>
+            m.stage === node.stage &&
+            m.field === node.field &&
+            m.kickoff_time.slice(0, 5) === node.kickoff_time.slice(0, 5)
+        );
+      }
 
       if (existing) {
         // Jangan timpa laga yang sudah selesai kecuali flag force = true
@@ -104,8 +169,13 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Jika timnya berubah (misal pemenang babak sebelumnya baru saja selesai atau ada override)
-        if (existing.team_a_id !== homeTeam.id || existing.team_b_id !== awayTeam.id) {
+        // Jika timnya berubah atau kode partai perlu dipastikan tersimpan
+        const needsUpdate =
+          existing.team_a_id !== homeTeam.id ||
+          existing.team_b_id !== awayTeam.id ||
+          existing.group_name !== node.code;
+
+        if (needsUpdate) {
           await dbMatches.update(existing.id, {
             team_a_id: homeTeam.id,
             team_b_id: awayTeam.id,

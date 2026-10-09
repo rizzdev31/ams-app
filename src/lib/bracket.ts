@@ -122,8 +122,16 @@ export function getGroupLeaders(
         m.stage === 'grup' &&
         (m.group_name === effectiveGrp || m.group_name === grp)
     );
-    // Grup 4 tim punya 6 pertandingan total
-    const isComplete = groupMatches.length >= 6 && groupMatches.every((m) => m.status === 'finished');
+
+    // Deteksi apakah fase grup sudah selesai:
+    // 1. Jika ada override eksplisit dari panitia untuk juara & runner-up -> pasti complete.
+    // 2. Jika semua laga terjadwal di grup ini sudah berstatus 'finished' (tahan skenario tim mundur/WO
+    //    di mana jumlah laga bisa kurang dari 6 karena ada laga ditiadakan).
+    const groupTeamsCount = scopedTeams.filter((t) => t.group_name === effectiveGrp || t.group_name === grp).length;
+    const hasMatches = groupMatches.length > 0;
+    const allMatchesFinished = hasMatches && groupMatches.every((m) => m.status === 'finished');
+    const minMatchesExpected = groupTeamsCount <= 2 ? 1 : groupTeamsCount === 3 ? 3 : 6;
+    let isComplete = allMatchesFinished && groupMatches.length >= Math.min(minMatchesExpected, groupMatches.length);
 
     let winner = rows[0]?.team ?? null;
     let runnerUp = rows[1]?.team ?? null;
@@ -145,6 +153,11 @@ export function getGroupLeaders(
           runnerUp = found;
           overridden = true;
         }
+      }
+      // Jika panitia menetapkan juara dan runner-up manual (misal tiebreak koin toss atau tim WO),
+      // tandai grup sebagai selesai sehingga babak gugur dapat diproses
+      if (override.winnerId && override.runnerUpId) {
+        isComplete = true;
       }
     }
 
@@ -229,7 +242,27 @@ export function buildTournamentBracket(
   );
 
   // Helper untuk mencari match di DB
-  const findMatch = (stage: MatchStage, field: string, time: string): MatchWithTeams | null => {
+  // 1. Mengutamakan kecocokan kode partai unik (group_name, misal 'AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'FINAL', 'JUARA_3' atau alias U12)
+  // 2. Fallback ke pencocokan stage + field + kickoff_time jika group_name belum terisi
+  const findMatch = (stage: MatchStage, code: string, field: string, time: string): MatchWithTeams | null => {
+    const byCode = koMatches.find((m) => {
+      if (m.stage !== stage) return false;
+      if (!m.group_name) return false;
+      const gn = m.group_name.trim();
+      if (gn === code) return true;
+      // Alias mapping antara kode babak U10 dan U12
+      if (code === 'AA' && gn === 'WW') return true;
+      if (code === 'BB' && gn === 'XX') return true;
+      if (code === 'CC' && gn === 'YY') return true;
+      if (code === 'DD' && gn === 'ZZ') return true;
+      if (code === 'WW' && gn === 'AA') return true;
+      if (code === 'XX' && gn === 'BB') return true;
+      if (code === 'YY' && gn === 'CC') return true;
+      if (code === 'ZZ' && gn === 'DD') return true;
+      return false;
+    });
+    if (byCode) return byCode;
+
     return (
       koMatches.find(
         (m) =>
@@ -260,7 +293,7 @@ export function buildTournamentBracket(
     if (slotOvr?.homeTeamId) homeTeam = findTeamById(slotOvr.homeTeamId) ?? homeTeam;
     if (slotOvr?.awayTeamId) awayTeam = findTeamById(slotOvr.awayTeamId) ?? awayTeam;
 
-    const dbMatch = findMatch('perempat_final', q.field, q.time);
+    const dbMatch = findMatch('perempat_final', q.code, q.field, q.time);
     const outcome = getMatchOutcome(dbMatch);
     const isDrawWithoutWinner = Boolean(
       dbMatch && dbMatch.status === 'finished' && dbMatch.score_a === dbMatch.score_b && !outcome.winner
@@ -270,18 +303,18 @@ export function buildTournamentBracket(
       code: q.code,
       title: q.title,
       stage: 'perempat_final',
-      field: q.field,
-      kickoff_time: q.time,
-      match_date: cfg.date,
+      field: dbMatch?.field ?? q.field,
+      kickoff_time: dbMatch?.kickoff_time ? dbMatch.kickoff_time.slice(0, 5) : q.time,
+      match_date: dbMatch?.match_date ?? cfg.date,
       homeSlot: {
         code: q.home,
         label: q.homeLabel,
-        team: dbMatch?.team_a ?? homeTeam,
+        team: slotOvr?.homeTeamId ? (findTeamById(slotOvr.homeTeamId) ?? homeTeam) : (dbMatch?.team_a ?? homeTeam),
       },
       awaySlot: {
         code: q.away,
         label: q.awayLabel,
-        team: dbMatch?.team_b ?? awayTeam,
+        team: slotOvr?.awayTeamId ? (findTeamById(slotOvr.awayTeamId) ?? awayTeam) : (dbMatch?.team_b ?? awayTeam),
       },
       match: dbMatch,
       winnerTeam: outcome.winner,
@@ -308,7 +341,7 @@ export function buildTournamentBracket(
     if (slotOvr?.homeTeamId) homeTeam = findTeamById(slotOvr.homeTeamId) ?? homeTeam;
     if (slotOvr?.awayTeamId) awayTeam = findTeamById(slotOvr.awayTeamId) ?? awayTeam;
 
-    const dbMatch = findMatch('semifinal', s.field, s.time);
+    const dbMatch = findMatch('semifinal', s.code, s.field, s.time);
     const outcome = getMatchOutcome(dbMatch);
     const isDrawWithoutWinner = Boolean(
       dbMatch && dbMatch.status === 'finished' && dbMatch.score_a === dbMatch.score_b && !outcome.winner
@@ -318,18 +351,18 @@ export function buildTournamentBracket(
       code: s.code,
       title: s.title,
       stage: 'semifinal',
-      field: s.field,
-      kickoff_time: s.time,
-      match_date: cfg.date,
+      field: dbMatch?.field ?? s.field,
+      kickoff_time: dbMatch?.kickoff_time ? dbMatch.kickoff_time.slice(0, 5) : s.time,
+      match_date: dbMatch?.match_date ?? cfg.date,
       homeSlot: {
         code: s.home,
         label: s.homeLabel,
-        team: dbMatch?.team_a ?? homeTeam,
+        team: slotOvr?.homeTeamId ? (findTeamById(slotOvr.homeTeamId) ?? homeTeam) : (dbMatch?.team_a ?? homeTeam),
       },
       awaySlot: {
         code: s.away,
         label: s.awayLabel,
-        team: dbMatch?.team_b ?? awayTeam,
+        team: slotOvr?.awayTeamId ? (findTeamById(slotOvr.awayTeamId) ?? awayTeam) : (dbMatch?.team_b ?? awayTeam),
       },
       match: dbMatch,
       winnerTeam: outcome.winner,
@@ -358,7 +391,7 @@ export function buildTournamentBracket(
     if (slotOvr?.homeTeamId) homeTeam = findTeamById(slotOvr.homeTeamId) ?? homeTeam;
     if (slotOvr?.awayTeamId) awayTeam = findTeamById(slotOvr.awayTeamId) ?? awayTeam;
 
-    const dbMatch = findMatch('final', f.field, f.time);
+    const dbMatch = findMatch('final', f.code, f.field, f.time);
     const outcome = getMatchOutcome(dbMatch);
     const isDrawWithoutWinner = Boolean(
       dbMatch && dbMatch.status === 'finished' && dbMatch.score_a === dbMatch.score_b && !outcome.winner
@@ -368,18 +401,18 @@ export function buildTournamentBracket(
       code: f.code,
       title: f.title,
       stage: 'final' as MatchStage,
-      field: f.field,
-      kickoff_time: f.time,
-      match_date: cfg.date,
+      field: dbMatch?.field ?? f.field,
+      kickoff_time: dbMatch?.kickoff_time ? dbMatch.kickoff_time.slice(0, 5) : f.time,
+      match_date: dbMatch?.match_date ?? cfg.date,
       homeSlot: {
         code: f.home,
         label: f.homeLabel,
-        team: dbMatch?.team_a ?? homeTeam,
+        team: slotOvr?.homeTeamId ? (findTeamById(slotOvr.homeTeamId) ?? homeTeam) : (dbMatch?.team_a ?? homeTeam),
       },
       awaySlot: {
         code: f.away,
         label: f.awayLabel,
-        team: dbMatch?.team_b ?? awayTeam,
+        team: slotOvr?.awayTeamId ? (findTeamById(slotOvr.awayTeamId) ?? awayTeam) : (dbMatch?.team_b ?? awayTeam),
       },
       match: dbMatch,
       winnerTeam: outcome.winner,
@@ -403,7 +436,7 @@ export function buildTournamentBracket(
     if (slotOvr?.homeTeamId) homeTeam = findTeamById(slotOvr.homeTeamId) ?? homeTeam;
     if (slotOvr?.awayTeamId) awayTeam = findTeamById(slotOvr.awayTeamId) ?? awayTeam;
 
-    const dbMatch = findMatch('juara_3', t.field, t.time);
+    const dbMatch = findMatch('juara_3', t.code, t.field, t.time);
     const outcome = getMatchOutcome(dbMatch);
     const isDrawWithoutWinner = Boolean(
       dbMatch && dbMatch.status === 'finished' && dbMatch.score_a === dbMatch.score_b && !outcome.winner
@@ -413,18 +446,18 @@ export function buildTournamentBracket(
       code: t.code,
       title: t.title,
       stage: 'juara_3' as MatchStage,
-      field: t.field,
-      kickoff_time: t.time,
-      match_date: cfg.date,
+      field: dbMatch?.field ?? t.field,
+      kickoff_time: dbMatch?.kickoff_time ? dbMatch.kickoff_time.slice(0, 5) : t.time,
+      match_date: dbMatch?.match_date ?? cfg.date,
       homeSlot: {
         code: t.home,
         label: t.homeLabel,
-        team: dbMatch?.team_a ?? homeTeam,
+        team: slotOvr?.homeTeamId ? (findTeamById(slotOvr.homeTeamId) ?? homeTeam) : (dbMatch?.team_a ?? homeTeam),
       },
       awaySlot: {
         code: t.away,
         label: t.awayLabel,
-        team: dbMatch?.team_b ?? awayTeam,
+        team: slotOvr?.awayTeamId ? (findTeamById(slotOvr.awayTeamId) ?? awayTeam) : (dbMatch?.team_b ?? awayTeam),
       },
       match: dbMatch,
       winnerTeam: outcome.winner,

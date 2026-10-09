@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { MatchWithTeams, MatchFormData, MatchStage } from '@/lib/types';
 import { formatShortDate, formatTime, todayWIB, getMatchPartai } from '@/lib/utils';
 import {
@@ -29,6 +29,13 @@ export default function JadwalPanitia() {
   const [bracketCategory, setBracketCategory] = useState<'U10' | 'U12'>('U10');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncCat, setSyncCat] = useState<'U10' | 'U12'>('U10');
+  const [syncTab, setSyncTab] = useState<'bracket' | 'group'>('bracket');
+  const [groupOverrides, setGroupOverrides] = useState<Record<string, { winnerId?: string; runnerUpId?: string }>>({});
+  const [slotOverrides, setSlotOverrides] = useState<Record<string, { homeTeamId?: string; awayTeamId?: string }>>({});
+  const [forceSync, setForceSync] = useState(false);
+  const [bracketPreview, setBracketPreview] = useState<any>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const [formData, setFormData] = useState<MatchFormData>({
     team_a_id: '',
@@ -130,19 +137,50 @@ export default function JadwalPanitia() {
     }
   };
 
-  const handleSyncBracket = async (cat: 'U10' | 'U12') => {
+  // Ambil data pratinjau bagan saat modal dibuka atau kategori diganti
+  useEffect(() => {
+    if (!syncModalOpen) return;
+    let isCancelled = false;
+    setLoadingPreview(true);
+    fetch(`/api/matches/bracket-sync?category=${syncCat}`)
+      .then((res) => res.json())
+      .then((resData) => {
+        if (!isCancelled && resData.success) {
+          setBracketPreview(resData.data);
+        }
+      })
+      .catch(() => {
+        // Abaikan atau tampilkan warning jika offline
+      })
+      .finally(() => {
+        if (!isCancelled) setLoadingPreview(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [syncModalOpen, syncCat]);
+
+  const handleApplyBracketSync = async () => {
     setIsSyncing(true);
     try {
       const res = await fetch('/api/matches/bracket-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: cat }),
+        body: JSON.stringify({
+          category: syncCat,
+          groupOverrides: Object.keys(groupOverrides).length > 0 ? groupOverrides : undefined,
+          slotOverrides: Object.keys(slotOverrides).length > 0 ? slotOverrides : undefined,
+          force: forceSync,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         void matchesStore.refresh();
         announceChangeEverywhere();
-        const successMsg = `⚡ Bagan ${cat} berhasil disinkronkan! ${data.message || ''}`;
+        const updated = data.data?.updatedCount ?? 0;
+        const created = data.data?.createdCount ?? 0;
+        const successMsg = `⚡ Bagan ${syncCat} berhasil diterapkan! (${updated} partai diperbarui, ${created} partai baru dibuat).`;
         setMessage({
           type: 'success',
           text: successMsg,
@@ -495,12 +533,15 @@ export default function JadwalPanitia() {
 
             <div className="flex items-center gap-3">
               <button
-                disabled={isSyncing}
-                onClick={() => handleSyncBracket(bracketCategory)}
-                className="label flex h-11 items-center gap-2 rounded-full bg-blue px-5 text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+                type="button"
+                onClick={() => {
+                  setSyncCat(bracketCategory);
+                  setSyncModalOpen(true);
+                }}
+                className="label flex h-11 items-center gap-2 rounded-full bg-blue px-5 text-ink transition-opacity hover:opacity-90"
               >
                 <span>⚡</span>
-                <span>{isSyncing ? 'Menyinkronkan…' : `Update Bagan ${bracketCategory} dari Klasemen`}</span>
+                <span>Atur & Sinkronkan Bagan {bracketCategory}</span>
               </button>
             </div>
           </div>
@@ -618,64 +659,538 @@ export default function JadwalPanitia() {
       )}
 
       {syncModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-[28px] border border-line bg-surface p-6">
-            <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 className="flex items-center gap-2 font-display text-xl font-extrabold">
-                <span>⚡</span>
-                <span>Sinkronkan Bagan Babak Gugur</span>
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-sm animate-reveal">
+          <div className="flex flex-col w-full max-w-3xl max-h-[92vh] rounded-[28px] border border-line bg-surface shadow-2xl overflow-hidden">
+            {/* Header Modal */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4 sm:p-5 bg-raise/50 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue/15 text-blue text-sm">
+                  ⚡
+                </span>
+                <div>
+                  <h3 className="font-display text-base sm:text-lg font-extrabold text-text">
+                    Distribusi & Penyesuaian Bagan Babak Gugur
+                  </h3>
+                  <p className="text-[11px] text-muted font-mono">
+                    Atasi tim mundur (WO), koin-tos, dan penyesuaian distribusi partai di lapangan
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setSyncModalOpen(false)}
-                className="label h-8 px-2 text-muted hover:text-text"
+                className="label h-8 px-2.5 rounded-full border border-line text-muted hover:text-text hover:bg-raise/80 transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <p className="mt-4 text-sm leading-relaxed text-muted">
-              Sistem akan membaca klasemen babak grup saat ini dan otomatis mengisi peserta babak gugur
-              (8 Besar, Semifinal, Final, Juara 3) berdasarkan Juara & Runner-up tiap grup sesuai bagan resmi di rundown PDF.
-            </p>
+            {/* Sub-bar: Kategori Selector & Mode Tabs */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-line bg-surface shrink-0">
+              {/* Kategori Switcher */}
+              <div className="flex items-center gap-1.5 p-1 rounded-full border border-line bg-raise/40">
+                <button
+                  type="button"
+                  onClick={() => setSyncCat('U10')}
+                  className={`label px-3 py-1 rounded-full transition-colors ${
+                    syncCat === 'U10'
+                      ? 'bg-blue text-white shadow-sm font-bold'
+                      : 'text-muted hover:text-text'
+                  }`}
+                >
+                  U-10 (Jum&apos;at 9 Okt)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSyncCat('U12')}
+                  className={`label px-3 py-1 rounded-full transition-colors ${
+                    syncCat === 'U12'
+                      ? 'bg-blue text-white shadow-sm font-bold'
+                      : 'text-muted hover:text-text'
+                  }`}
+                >
+                  U-12 (Sabtu 10 Okt)
+                </button>
+              </div>
 
-            <div className="mt-6 space-y-3">
-              <button
-                disabled={isSyncing}
-                onClick={() => handleSyncBracket('U10')}
-                className="flex w-full items-center justify-between rounded-2xl border border-line bg-raise/50 p-4 text-left transition-colors hover:border-blue/50 disabled:opacity-50"
-              >
-                <div>
-                  <p className="font-bold text-text">Sinkronkan Kategori U10</p>
-                  <p className="text-xs text-muted">Jum&apos;at, 9 Okt · Grup A, B, C, D</p>
-                </div>
-                <span className="label rounded-full bg-blue/15 px-3 py-1.5 text-xs text-blue">
-                  {isSyncing ? 'Proses…' : 'Mulai →'}
-                </span>
-              </button>
-
-              <button
-                disabled={isSyncing}
-                onClick={() => handleSyncBracket('U12')}
-                className="flex w-full items-center justify-between rounded-2xl border border-line bg-raise/50 p-4 text-left transition-colors hover:border-blue/50 disabled:opacity-50"
-              >
-                <div>
-                  <p className="font-bold text-text">Sinkronkan Kategori U12</p>
-                  <p className="text-xs text-muted">Sabtu, 10 Okt · Grup W, X, Y, Z</p>
-                </div>
-                <span className="label rounded-full bg-blue/15 px-3 py-1.5 text-xs text-blue">
-                  {isSyncing ? 'Proses…' : 'Mulai →'}
-                </span>
-              </button>
+              {/* Tab Navigasi */}
+              <div className="flex items-center gap-2 text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => setSyncTab('bracket')}
+                  className={`px-3 py-1.5 rounded-xl border transition-colors ${
+                    syncTab === 'bracket'
+                      ? 'bg-blue/15 border-blue/40 text-blue font-bold'
+                      : 'border-transparent text-muted hover:text-text'
+                  }`}
+                >
+                  ⚔️ Distribusi Partai Gugur
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSyncTab('group')}
+                  className={`px-3 py-1.5 rounded-xl border transition-colors ${
+                    syncTab === 'group'
+                      ? 'bg-blue/15 border-blue/40 text-blue font-bold'
+                      : 'border-transparent text-muted hover:text-text'
+                  }`}
+                >
+                  📊 Juara Grup & WO
+                </button>
+              </div>
             </div>
 
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setSyncModalOpen(false)}
-                className="label h-11 w-full rounded-full border border-line text-muted hover:text-text"
-              >
-                Tutup
-              </button>
+            {/* Body Scrollable */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+              {loadingPreview ? (
+                <div className="py-12 text-center space-y-3">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-blue border-t-transparent" />
+                  <p className="text-xs font-mono text-muted">Menganalisis bagan dan klasemen...</p>
+                </div>
+              ) : syncTab === 'bracket' ? (
+                /* TAB 1: DISTRIBUSI PARTAI GUGUR */
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-line bg-raise/30 p-3.5 text-xs text-muted leading-relaxed">
+                    💡 <strong className="text-text">Distribusi Fleksibel:</strong> Sistem telah membaca pemenang grup & babak sebelumnya secara otomatis. Jika di lapangan terjadi kendala (rotasi jadwal, tim mundur, atau kesepakatan panitia), Anda dapat memilih langsung tim yang mengisi slot Tim A / Tim B pada partai di bawah ini.
+                  </div>
+
+                  {/* 8 BESAR (QUARTERFINALS) */}
+                  <div className="space-y-3">
+                    <h4 className="font-display text-xs font-extrabold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                      <span>🥊</span>
+                      <span>Babak 8 Besar (Perempat Final)</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {(bracketPreview?.quarterfinals || []).map((node: any) => {
+                        const ovr = slotOverrides[node.code] || {};
+                        const currentHomeId = ovr.homeTeamId ?? node.homeSlot?.team?.id ?? '';
+                        const currentAwayId = ovr.awayTeamId ?? node.awaySlot?.team?.id ?? '';
+                        const hasOvr = Boolean(ovr.homeTeamId || ovr.awayTeamId);
+
+                        return (
+                          <div
+                            key={node.code}
+                            className={`p-3.5 rounded-2xl border transition-all ${
+                              hasOvr ? 'border-yellow/50 bg-yellow/5' : 'border-line bg-raise/40'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between border-b border-line/60 pb-2 mb-2.5 text-xs font-mono">
+                              <span className="font-bold text-text">{node.title}</span>
+                              <span className="text-[10px] text-muted">
+                                Lap {node.field} · {node.kickoff_time} WIB
+                              </span>
+                            </div>
+
+                            <div className="space-y-2 text-xs">
+                              {/* Home Team */}
+                              <div>
+                                <label className="block text-[10px] font-mono text-muted mb-0.5">
+                                  Tim A ({node.homeSlot?.label}):
+                                </label>
+                                <select
+                                  value={currentHomeId}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSlotOverrides((prev) => ({
+                                      ...prev,
+                                      [node.code]: { ...prev[node.code], homeTeamId: val || undefined },
+                                    }));
+                                  }}
+                                  className="w-full rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
+                                >
+                                  <option value="">-- Otomatis / Belum Ada --</option>
+                                  {(bracketPreview?.teams || []).map((t: any) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name} (Grup {t.group_name})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Away Team */}
+                              <div>
+                                <label className="block text-[10px] font-mono text-muted mb-0.5">
+                                  Tim B ({node.awaySlot?.label}):
+                                </label>
+                                <select
+                                  value={currentAwayId}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSlotOverrides((prev) => ({
+                                      ...prev,
+                                      [node.code]: { ...prev[node.code], awayTeamId: val || undefined },
+                                    }));
+                                  }}
+                                  className="w-full rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
+                                >
+                                  <option value="">-- Otomatis / Belum Ada --</option>
+                                  {(bracketPreview?.teams || []).map((t: any) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name} (Grup {t.group_name})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            {hasOvr && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSlotOverrides((prev) => {
+                                    const next = { ...prev };
+                                    delete next[node.code];
+                                    return next;
+                                  });
+                                }}
+                                className="mt-2 text-[10px] font-mono text-yellow hover:underline"
+                              >
+                                ↺ Reset ke Otomatis
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* SEMIFINAL */}
+                  <div className="space-y-3 pt-2">
+                    <h4 className="font-display text-xs font-extrabold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                      <span>🥈</span>
+                      <span>Babak Semifinal</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {(bracketPreview?.semifinals || []).map((node: any) => {
+                        const ovr = slotOverrides[node.code] || {};
+                        const currentHomeId = ovr.homeTeamId ?? node.homeSlot?.team?.id ?? '';
+                        const currentAwayId = ovr.awayTeamId ?? node.awaySlot?.team?.id ?? '';
+                        const hasOvr = Boolean(ovr.homeTeamId || ovr.awayTeamId);
+
+                        return (
+                          <div
+                            key={node.code}
+                            className={`p-3.5 rounded-2xl border transition-all ${
+                              hasOvr ? 'border-yellow/50 bg-yellow/5' : 'border-line bg-raise/40'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between border-b border-line/60 pb-2 mb-2.5 text-xs font-mono">
+                              <span className="font-bold text-text">{node.title}</span>
+                              <span className="text-[10px] text-muted">
+                                Lap {node.field} · {node.kickoff_time} WIB
+                              </span>
+                            </div>
+
+                            <div className="space-y-2 text-xs">
+                              <div>
+                                <label className="block text-[10px] font-mono text-muted mb-0.5">
+                                  Tim A ({node.homeSlot?.label}):
+                                </label>
+                                <select
+                                  value={currentHomeId}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSlotOverrides((prev) => ({
+                                      ...prev,
+                                      [node.code]: { ...prev[node.code], homeTeamId: val || undefined },
+                                    }));
+                                  }}
+                                  className="w-full rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
+                                >
+                                  <option value="">-- Otomatis / Belum Ada --</option>
+                                  {(bracketPreview?.teams || []).map((t: any) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name} (Grup {t.group_name})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-mono text-muted mb-0.5">
+                                  Tim B ({node.awaySlot?.label}):
+                                </label>
+                                <select
+                                  value={currentAwayId}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSlotOverrides((prev) => ({
+                                      ...prev,
+                                      [node.code]: { ...prev[node.code], awayTeamId: val || undefined },
+                                    }));
+                                  }}
+                                  className="w-full rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
+                                >
+                                  <option value="">-- Otomatis / Belum Ada --</option>
+                                  {(bracketPreview?.teams || []).map((t: any) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name} (Grup {t.group_name})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            {hasOvr && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSlotOverrides((prev) => {
+                                    const next = { ...prev };
+                                    delete next[node.code];
+                                    return next;
+                                  });
+                                }}
+                                className="mt-2 text-[10px] font-mono text-yellow hover:underline"
+                              >
+                                ↺ Reset ke Otomatis
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* FINAL & JUARA 3 */}
+                  <div className="space-y-3 pt-2">
+                    <h4 className="font-display text-xs font-extrabold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                      <span>🏆</span>
+                      <span>Babak Final & Perebutan Juara 3</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[bracketPreview?.finalMatch, bracketPreview?.thirdPlaceMatch]
+                        .filter(Boolean)
+                        .map((node: any) => {
+                          const ovr = slotOverrides[node.code] || {};
+                          const currentHomeId = ovr.homeTeamId ?? node.homeSlot?.team?.id ?? '';
+                          const currentAwayId = ovr.awayTeamId ?? node.awaySlot?.team?.id ?? '';
+                          const hasOvr = Boolean(ovr.homeTeamId || ovr.awayTeamId);
+
+                          return (
+                            <div
+                              key={node.code}
+                              className={`p-3.5 rounded-2xl border transition-all ${
+                                hasOvr ? 'border-yellow/50 bg-yellow/5' : 'border-line bg-raise/40'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between border-b border-line/60 pb-2 mb-2.5 text-xs font-mono">
+                                <span className="font-bold text-text">{node.title}</span>
+                                <span className="text-[10px] text-muted">
+                                  Lap {node.field} · {node.kickoff_time} WIB
+                                </span>
+                              </div>
+
+                              <div className="space-y-2 text-xs">
+                                <div>
+                                  <label className="block text-[10px] font-mono text-muted mb-0.5">
+                                    Tim A ({node.homeSlot?.label}):
+                                  </label>
+                                  <select
+                                    value={currentHomeId}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setSlotOverrides((prev) => ({
+                                        ...prev,
+                                        [node.code]: { ...prev[node.code], homeTeamId: val || undefined },
+                                      }));
+                                    }}
+                                    className="w-full rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
+                                  >
+                                    <option value="">-- Otomatis / Belum Ada --</option>
+                                    {(bracketPreview?.teams || []).map((t: any) => (
+                                      <option key={t.id} value={t.id}>
+                                        {t.name} (Grup {t.group_name})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-mono text-muted mb-0.5">
+                                    Tim B ({node.awaySlot?.label}):
+                                  </label>
+                                  <select
+                                    value={currentAwayId}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setSlotOverrides((prev) => ({
+                                        ...prev,
+                                        [node.code]: { ...prev[node.code], awayTeamId: val || undefined },
+                                      }));
+                                    }}
+                                    className="w-full rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
+                                  >
+                                    <option value="">-- Otomatis / Belum Ada --</option>
+                                    {(bracketPreview?.teams || []).map((t: any) => (
+                                      <option key={t.id} value={t.id}>
+                                        {t.name} (Grup {t.group_name})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+
+                              {hasOvr && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSlotOverrides((prev) => {
+                                      const next = { ...prev };
+                                      delete next[node.code];
+                                      return next;
+                                    });
+                                  }}
+                                  className="mt-2 text-[10px] font-mono text-yellow hover:underline"
+                                >
+                                  ↺ Reset ke Otomatis
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* TAB 2: OVERRIDE JUARA GRUP & TIM MUNDUR (WO) */
+                <div className="space-y-5">
+                  <div className="rounded-2xl border border-line bg-raise/30 p-3.5 text-xs text-muted leading-relaxed">
+                    ⚙️ <strong className="text-text">Peringkat Khusus Babak Grup:</strong> Bila ada tim yang tiba-tiba mengundurkan diri (WO), diskualifikasi, atau perolehan nilai dan head-to-head imbang yang membutuhkan koin-tos panitia, tentukan Juara & Runner-up secara manual di bawah ini. Bagan 8 besar akan langsung mengadopsi pilihan ini.
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {['A', 'B', 'C', 'D'].map((grp) => {
+                      const displayGrp = syncCat === 'U12' ? (grp === 'A' ? 'W' : grp === 'B' ? 'X' : grp === 'C' ? 'Y' : 'Z') : grp;
+                      const ovr = groupOverrides[displayGrp] || {};
+                      const groupTeams = (bracketPreview?.teams || []).filter(
+                        (t: any) => t.group_name === displayGrp || t.group_name === grp
+                      );
+
+                      return (
+                        <div key={grp} className="p-4 rounded-2xl border border-line bg-raise/40 space-y-3">
+                          <div className="flex items-center justify-between border-b border-line/60 pb-2">
+                            <span className="font-bold text-text font-display">Grup {displayGrp}</span>
+                            <span className="text-[10px] font-mono text-muted">{groupTeams.length} Tim Terdaftar</span>
+                          </div>
+
+                          <div className="space-y-2 text-xs">
+                            <div>
+                              <label className="block text-[10px] font-mono text-muted mb-0.5">
+                                Juara Grup (Peringkat 1):
+                              </label>
+                              <select
+                                value={ovr.winnerId ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setGroupOverrides((prev) => ({
+                                    ...prev,
+                                    [displayGrp]: { ...prev[displayGrp], winnerId: val || undefined },
+                                  }));
+                                }}
+                                className="w-full rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
+                              >
+                                <option value="">-- Hitungan Klasemen Otomatis --</option>
+                                {groupTeams.map((t: any) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-mono text-muted mb-0.5">
+                                Runner-up Grup (Peringkat 2):
+                              </label>
+                              <select
+                                value={ovr.runnerUpId ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setGroupOverrides((prev) => ({
+                                    ...prev,
+                                    [displayGrp]: { ...prev[displayGrp], runnerUpId: val || undefined },
+                                  }));
+                                }}
+                                className="w-full rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs text-text focus:border-blue focus:outline-none"
+                              >
+                                <option value="">-- Hitungan Klasemen Otomatis --</option>
+                                {groupTeams.map((t: any) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {(ovr.winnerId || ovr.runnerUpId) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGroupOverrides((prev) => {
+                                  const next = { ...prev };
+                                  delete next[displayGrp];
+                                  return next;
+                                });
+                              }}
+                              className="text-[10px] font-mono text-yellow hover:underline"
+                            >
+                              ↺ Reset Grup {displayGrp}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal: Tombol Aksi */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4 sm:p-5 bg-raise/50 shrink-0">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="forceSyncCheck"
+                  checked={forceSync}
+                  onChange={(e) => setForceSync(e.target.checked)}
+                  className="rounded border-line bg-surface text-blue focus:ring-0"
+                />
+                <label htmlFor="forceSyncCheck" className="text-xs font-mono text-muted cursor-pointer select-none">
+                  Paksa perbarui partai yang sudah berstatus selesai
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {(Object.keys(slotOverrides).length > 0 || Object.keys(groupOverrides).length > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSlotOverrides({});
+                      setGroupOverrides({});
+                    }}
+                    className="label h-10 px-3 rounded-full border border-line text-muted hover:text-text transition-colors"
+                  >
+                    Reset Semua
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSyncModalOpen(false)}
+                  className="label h-10 px-4 rounded-full border border-line text-muted hover:text-text transition-colors"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  disabled={isSyncing}
+                  onClick={handleApplyBracketSync}
+                  className="label h-10 px-5 rounded-full bg-blue text-white shadow-md hover:bg-blue/90 disabled:opacity-50 transition-all font-bold"
+                >
+                  {isSyncing ? 'Menerapkan…' : '⚡ Terapkan & Simpan ke Jadwal'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

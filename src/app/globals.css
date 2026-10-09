@@ -38,11 +38,7 @@
   --font-mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
 }
 
-@property --a {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
+
 
 @layer base {
   html {
@@ -411,29 +407,7 @@
   animation: draw 2.4s 0.2s var(--ease-out) forwards;
 }
 
-/* 5b. Bola menyusuri lintasan — pengisi ruang kosong hero. */
-@keyframes fly {
-  0% {
-    offset-distance: 0%;
-    opacity: 0;
-  }
-  8% {
-    opacity: 1;
-  }
-  70% {
-    offset-distance: 100%;
-    opacity: 1;
-  }
-  100% {
-    offset-distance: 100%;
-    opacity: 0;
-  }
-}
-.animate-ball {
-  offset-path: path("M60 420 C 200 120, 380 80, 520 300");
-  offset-distance: 0%;
-  animation: fly 4.5s 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
+
 
 /* 5c. Progres gulir di tepi atas. */
 #prog {
@@ -495,15 +469,7 @@
   animation-play-state: paused;
 }
 
-/* 7. Bingkai LIVE berputar — hanya pada kartu yang benar-benar live. */
-@keyframes halo {
-  to {
-    --a: 360deg;
-  }
-}
-.animate-halo::before {
-  animation: halo 5s linear infinite;
-}
+
 
 /* 8. Kerangka memuat — linear, tanpa kilau. */
 @keyframes skeleton {

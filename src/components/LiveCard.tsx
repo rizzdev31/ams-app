@@ -32,16 +32,7 @@ export default function LiveCard({ match, index = 0 }: { match: MatchWithTeams; 
       >
       <span
         aria-hidden
-        className="animate-halo pointer-events-none absolute inset-0 -z-10 rounded-2xl sm:rounded-[32px] p-[1.5px]"
-        style={{
-          background:
-            'conic-gradient(from var(--a), transparent 0 60%, var(--color-yellow) 82%, transparent 100%)',
-          WebkitMask:
-            'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-          mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-          WebkitMaskComposite: 'xor',
-          maskComposite: 'exclude',
-        }}
+        className="pointer-events-none absolute inset-0 -z-10 rounded-2xl sm:rounded-[32px] border border-yellow/40 shadow-[0_0_24px_-6px_rgba(245,196,0,0.22)] transition-opacity"
       />
       <span
         key={pulse}

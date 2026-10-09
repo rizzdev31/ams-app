@@ -341,7 +341,7 @@ export default function DashboardPage() {
               return (
                 <div
                   key={m.id}
-                  className={`p-3.5 sm:p-5 rounded-2xl border transition-all relative overflow-hidden bg-slate-950/80 backdrop-blur-md ${
+                  className={`p-3.5 sm:p-5 rounded-2xl border transition-all relative overflow-hidden bg-slate-900/90 ${
                     isLive
                       ? 'border-rose-500/60 shadow-lg shadow-rose-500/10'
                       : isFinished
@@ -519,46 +519,55 @@ export default function DashboardPage() {
           {/* CARD VIDEO 1: MATCHDAY HIGHLIGHTS */}
           <div className="relative rounded-3xl overflow-hidden border border-cyan-500/30 bg-slate-950 p-5 shadow-xl flex flex-col justify-between group hover:border-cyan-400 transition-all">
             <div className="space-y-4">
-              {/* Video Player Preview */}
-              <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-slate-800">
-                <video
-                  src="/logovid.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
-
-                {/* Badge Atas */}
-                <div className="absolute top-3 left-3 z-10">
-                  <span className="px-2.5 py-1 rounded-lg bg-black/70 border border-cyan-400/50 text-[10px] font-mono font-bold text-cyan-300 backdrop-blur-md">
-                    MATCHDAY TEASER
-                  </span>
-                </div>
-                <div className="absolute top-3 right-3 z-10">
-                  <span className="px-2 py-1 rounded-lg bg-black/70 border border-slate-700 text-[10px] font-mono font-bold text-slate-300 backdrop-blur-md">
-                    0:45 • HD
-                  </span>
-                </div>
-
-                {/* Tombol Play Icon Tengah */}
-                <button
-                  type="button"
-                  onClick={() =>
+              {/* Video Player Preview Poster */}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  setActiveVideoModal({
+                    isOpen: true,
+                    title: 'Matchday Teaser & Highlights Laga',
+                    subtitle: 'Atmosfer Pertandingan & Gol Spektakuler',
+                    src: '/logovid.mp4',
+                  })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
                     setActiveVideoModal({
                       isOpen: true,
                       title: 'Matchday Teaser & Highlights Laga',
                       subtitle: 'Atmosfer Pertandingan & Gol Spektakuler',
                       src: '/logovid.mp4',
-                    })
+                    });
                   }
-                  className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-cyan-500/80 hover:bg-cyan-400 text-slate-950 flex items-center justify-center font-bold text-lg shadow-lg shadow-cyan-500/30 transition-transform active:scale-90"
-                  title="Putar Video Teaser"
-                >
+                }}
+                className="relative aspect-video w-full rounded-2xl overflow-hidden bg-gradient-to-tr from-slate-950 via-slate-900 to-cyan-950/60 border border-slate-800 cursor-pointer group/vid"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/Sampul.png"
+                  alt="Matchday Teaser"
+                  className="w-full h-full object-cover opacity-60 group-hover/vid:scale-105 transition-transform duration-500 filter brightness-90"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/35 pointer-events-none" />
+
+                {/* Badge Atas */}
+                <div className="absolute top-3 left-3 z-10">
+                  <span className="px-2.5 py-1 rounded-lg bg-black/80 border border-cyan-400/50 text-[10px] font-mono font-bold text-cyan-300">
+                    MATCHDAY TEASER
+                  </span>
+                </div>
+                <div className="absolute top-3 right-3 z-10">
+                  <span className="px-2 py-1 rounded-lg bg-black/80 border border-slate-700 text-[10px] font-mono font-bold text-slate-300">
+                    0:45 • HD
+                  </span>
+                </div>
+
+                {/* Tombol Play Icon Tengah */}
+                <div className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center font-bold text-xl shadow-lg shadow-cyan-500/40 group-hover/vid:scale-110 transition-transform">
                   ▶
-                </button>
+                </div>
               </div>
 
               <div>
@@ -598,46 +607,55 @@ export default function DashboardPage() {
           {/* CARD VIDEO 2: ARENA & PESANTREN PROFILE */}
           <div className="relative rounded-3xl overflow-hidden border border-emerald-500/30 bg-slate-950 p-5 shadow-xl flex flex-col justify-between group hover:border-emerald-400 transition-all">
             <div className="space-y-4">
-              {/* Video Player Preview */}
-              <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-slate-800">
-                <video
-                  src="/logovid.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
-
-                {/* Badge Atas */}
-                <div className="absolute top-3 left-3 z-10">
-                  <span className="px-2.5 py-1 rounded-lg bg-black/70 border border-emerald-400/50 text-[10px] font-mono font-bold text-emerald-300 backdrop-blur-md">
-                    PROFIL ARENA
-                  </span>
-                </div>
-                <div className="absolute top-3 right-3 z-10">
-                  <span className="px-2 py-1 rounded-lg bg-black/70 border border-slate-700 text-[10px] font-mono font-bold text-slate-300 backdrop-blur-md">
-                    1:15 • HD
-                  </span>
-                </div>
-
-                {/* Tombol Play Icon Tengah */}
-                <button
-                  type="button"
-                  onClick={() =>
+              {/* Video Player Preview Poster */}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  setActiveVideoModal({
+                    isOpen: true,
+                    title: 'Profil Arena & Fasilitas Pesantren An-Nur',
+                    subtitle: 'Lingkungan Modern, Nyaman, dan Berstandar Kompetisi',
+                    src: '/logovid.mp4',
+                  })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
                     setActiveVideoModal({
                       isOpen: true,
                       title: 'Profil Arena & Fasilitas Pesantren An-Nur',
                       subtitle: 'Lingkungan Modern, Nyaman, dan Berstandar Kompetisi',
                       src: '/logovid.mp4',
-                    })
+                    });
                   }
-                  className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-emerald-500/80 hover:bg-emerald-400 text-slate-950 flex items-center justify-center font-bold text-lg shadow-lg shadow-emerald-500/30 transition-transform active:scale-90"
-                  title="Putar Video Profil"
-                >
+                }}
+                className="relative aspect-video w-full rounded-2xl overflow-hidden bg-gradient-to-tr from-slate-950 via-slate-900 to-emerald-950/60 border border-slate-800 cursor-pointer group/vid"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/Sampul.png"
+                  alt="Profil Arena Pesantren An-Nur"
+                  className="w-full h-full object-cover opacity-60 group-hover/vid:scale-105 transition-transform duration-500 filter brightness-90 hue-rotate-30"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/35 pointer-events-none" />
+
+                {/* Badge Atas */}
+                <div className="absolute top-3 left-3 z-10">
+                  <span className="px-2.5 py-1 rounded-lg bg-black/80 border border-emerald-400/50 text-[10px] font-mono font-bold text-emerald-300">
+                    PROFIL ARENA
+                  </span>
+                </div>
+                <div className="absolute top-3 right-3 z-10">
+                  <span className="px-2 py-1 rounded-lg bg-black/80 border border-slate-700 text-[10px] font-mono font-bold text-slate-300">
+                    1:15 • HD
+                  </span>
+                </div>
+
+                {/* Tombol Play Icon Tengah */}
+                <div className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xl shadow-lg shadow-emerald-500/40 group-hover/vid:scale-110 transition-transform">
                   ▶
-                </button>
+                </div>
               </div>
 
               <div>
