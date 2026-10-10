@@ -6,7 +6,8 @@ import type { Match, MatchWithTeams, Team, StandingRow, GroupStandings } from '.
 export function calculateStandings(
   teams: Team[],
   matches: Match[] | MatchWithTeams[],
-  groupName: string
+  groupName: string,
+  winPoints: number = 3
 ): StandingRow[] {
   const groupTeams = teams.filter((t) => t.group_name === groupName);
   const finishedMatches = matches.filter((m) => {
@@ -58,8 +59,8 @@ export function calculateStandings(
       goals_for: gf,
       goals_against: ga,
       goal_difference: gf - ga,
-      // Regulasi Resmi Turnamen: Menang = 2 Poin, Seri = 1 Poin, Kalah = 0 Poin
-      points: won * 2 + drawn,
+      // Regulasi Resmi Turnamen: Menang = 3 Poin (default), Seri = 1 Poin, Kalah = 0 Poin
+      points: won * winPoints + drawn,
     };
   });
 
@@ -77,7 +78,7 @@ export function calculateStandings(
   };
 
   // Hierarki Tiebreaker Resmi Turnamen:
-  // 1. Akumulasi Poin Tertinggi (M=2, S=1, K=0)
+  // 1. Akumulasi Poin Tertinggi (M=3, S=1, K=0)
   // 2. Selisih Gol Tertinggi (Goal Difference = Gol Masuk - Gol Kebobolan)
   // 3. Produktivitas Gol Tertinggi (Jumlah Gol Memasukkan / Gol Dicetak)
   // 4. Head-to-Head (Hasil pertemuan langsung antar tim yang berpoin sama)
@@ -104,12 +105,13 @@ export function calculateStandings(
  */
 export function calculateAllStandings(
   teams: Team[],
-  matches: Match[] | MatchWithTeams[]
+  matches: Match[] | MatchWithTeams[],
+  winPoints: number = 3
 ): GroupStandings[] {
   const groupNames = [...new Set(teams.map((t) => t.group_name))].sort();
   return groupNames.map((group_name) => ({
     group_name,
-    rows: calculateStandings(teams, matches, group_name),
+    rows: calculateStandings(teams, matches, group_name, winPoints),
   }));
 }
 

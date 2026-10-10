@@ -22,7 +22,7 @@ const matches: Match[] = [
 ];
 
 describe('calculateStandings', () => {
-  it('menghitung poin (menang=2, seri=1, kalah=0), GD, dan urutan dengan benar', () => {
+  it('menghitung poin (menang=3, seri=1, kalah=0), GD, dan urutan dengan benar', () => {
     const rows = calculateStandings(teams, matches, 'A');
     const alpha = rows.find((r) => r.team.id === 'a')!;
     const beta = rows.find((r) => r.team.id === 'b')!;
@@ -32,11 +32,15 @@ describe('calculateStandings', () => {
     expect(alpha.goals_for).toBe(3);
     expect(alpha.goals_against).toBe(1);
     expect(alpha.goal_difference).toBe(2);
-    // Menang 1x (2 pt) + Seri 1x (1 pt) = 3 pt
-    expect(alpha.points).toBe(3);
+    // Standar Resmi: Menang 1x (3 pt) + Seri 1x (1 pt) = 4 pt
+    expect(alpha.points).toBe(4);
     // Kalah 1x (0 pt) + Seri 1x (1 pt) = 1 pt
     expect(beta.points).toBe(1);
     expect(rows[0].team.id).toBe('a');
+
+    // Uji sistem kustom 2 poin: Menang 1x (2 pt) + Seri 1x (1 pt) = 3 pt
+    const rows2 = calculateStandings(teams, matches, 'A', 2);
+    expect(rows2.find((r) => r.team.id === 'a')!.points).toBe(3);
   });
 
   it('menggunakan Head-to-Head ketika poin, selisih gol, dan gol masuk sama persis', () => {

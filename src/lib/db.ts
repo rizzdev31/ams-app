@@ -436,6 +436,10 @@ export const dbSettings = {
         if (colsDate.length === 0) {
           await execute("ALTER TABLE event_settings ADD COLUMN `active_date` DATE DEFAULT '2026-10-10'");
         }
+        const colsPts = await query<any>("SHOW COLUMNS FROM event_settings LIKE 'points_per_win'");
+        if (colsPts.length === 0) {
+          await execute("ALTER TABLE event_settings ADD COLUMN `points_per_win` INT DEFAULT 3");
+        }
       } catch {
         // Abaikan jika tabel belum dibuat atau hak akses terbatas
       }
@@ -453,7 +457,8 @@ export const dbSettings = {
           location, map_url, rules_text, tiebreak_rules, contact_info,
           passcode_field_1, passcode_field_2, passcode_scorer,
           active_category,
-          DATE_FORMAT(active_date, '%Y-%m-%d') as active_date
+          DATE_FORMAT(active_date, '%Y-%m-%d') as active_date,
+          COALESCE(points_per_win, 3) as points_per_win
         FROM event_settings LIMIT 1
       `);
       return row || null;
@@ -470,8 +475,8 @@ export const dbSettings = {
       if (!existing) {
         const id = 'f1bc52dd-0df6-4855-a179-bd48875935b6';
         await execute(
-          `INSERT INTO event_settings (id, event_name, start_date, end_date, location, map_url, rules_text, tiebreak_rules, contact_info, active_category, active_date)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO event_settings (id, event_name, start_date, end_date, location, map_url, rules_text, tiebreak_rules, contact_info, active_category, active_date, points_per_win)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id,
             patch.event_name || 'An-Nur Mini Soccer',
@@ -484,6 +489,7 @@ export const dbSettings = {
             patch.contact_info || null,
             patch.active_category || 'U12',
             patch.active_date || '2026-10-10',
+            patch.points_per_win || 3,
           ]
         );
         return this.get();

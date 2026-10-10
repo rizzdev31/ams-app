@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Monogram from '@/components/Monogram';
 import { calculateStandings, getU12LegacyGroup } from '@/lib/utils';
 import { useCategory } from '@/hooks/useCategory';
-import { matchesStore, teamsStore, useResource } from '@/lib/live-store';
+import { matchesStore, teamsStore, settingsStore, useResource } from '@/lib/live-store';
 
 const COLS: { key: string; label: string; title: string }[] = [
   { key: 'played', label: 'Mn', title: 'Main' },
@@ -19,6 +19,7 @@ export default function KlasemenPage() {
   // angka Poin di sini dijamin cocok dengan skor di Beranda dan Jadwal.
   const [teams] = useResource(teamsStore);
   const [matches, online, reload] = useResource(matchesStore);
+  const [settings] = useResource(settingsStore);
   const [category, setCategory] = useCategory('U10');
 
   const categories = useMemo(() => {
@@ -33,11 +34,12 @@ export default function KlasemenPage() {
     if (!activeCategory) return [];
     const scoped = teams.filter((t) => (t.category ?? 'U10') === activeCategory);
     const groupNames = [...new Set(scoped.map((t) => t.group_name))].sort();
+    const winPoints = settings?.points_per_win ?? 3;
     return groupNames.map((g) => ({
       group_name: g,
-      rows: calculateStandings(scoped, matches, g),
+      rows: calculateStandings(scoped, matches, g, winPoints),
     }));
-  }, [teams, matches, activeCategory]);
+  }, [teams, matches, activeCategory, settings?.points_per_win]);
 
   return (
     <div className="wrap pt-12">
@@ -230,7 +232,9 @@ export default function KlasemenPage() {
               <ul className="space-y-1.5 text-muted">
                 <li className="flex items-center justify-between">
                   <span>Menang (Win)</span>
-                  <span className="font-mono font-bold text-text bg-line/60 px-2 py-0.5 rounded">2 Poin</span>
+                  <span className="font-mono font-bold text-text bg-line/60 px-2 py-0.5 rounded">
+                    {settings?.points_per_win ?? 3} Poin
+                  </span>
                 </li>
                 <li className="flex items-center justify-between">
                   <span>Seri (Draw)</span>

@@ -36,6 +36,7 @@ const WRITABLE = [
   'passcode_scorer',
   'active_category',
   'active_date',
+  'points_per_win',
 ] as const;
 
 /** Fields that must contain a value, and the 400 message if they don't. */
@@ -53,6 +54,7 @@ const REQUIRED: Record<(typeof WRITABLE)[number], string> = {
   passcode_scorer: '',
   active_category: '',
   active_date: '',
+  points_per_win: '',
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -75,6 +77,15 @@ function sanitiseSettings(input: unknown): Record<string, string | null> {
 
     if (raw === undefined || raw === null) {
       // Absent value: leave it alone rather than wiping a stored setting.
+      continue;
+    }
+
+    if (field === 'points_per_win') {
+      const num = typeof raw === 'number' ? raw : parseInt(String(raw).trim(), 10);
+      if (isNaN(num) || num < 1 || num > 10) {
+        throw new Error('Poin kemenangan harus berupa angka antara 1 dan 10.');
+      }
+      out[field] = String(num);
       continue;
     }
 

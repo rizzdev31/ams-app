@@ -87,6 +87,8 @@ export interface EventSettings {
   active_category?: string;
   /** Tanggal pertandingan fokus turnamen yang sedang berjalan aktif: '2026-10-09' | '2026-10-10' */
   active_date?: string;
+  /** Poin untuk kemenangan di fase grup (default 3 poin) */
+  points_per_win?: number;
 }
 
 // === Archive / Container Snapshot Types ===

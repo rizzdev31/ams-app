@@ -396,6 +396,7 @@ export default function PengaturanPage() {
       contact_info: settings.contact_info,
       active_category: settings.active_category,
       active_date: settings.active_date,
+      points_per_win: settings.points_per_win ?? 3,
     };
 
     try {
@@ -902,6 +903,56 @@ export default function PengaturanPage() {
                   placeholder="Contoh: poin → selisih gol → gol masuk"
                   required
                 />
+              </div>
+
+              {/* Sistem Poin Kemenangan Fase Grup */}
+              <div className="space-y-2 md:col-span-2 pt-2 border-t border-line/60">
+                <label className="block text-sm font-semibold text-text">
+                  Sistem Poin Kemenangan (Fase Grup)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, points_per_win: 3 })}
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${
+                      (settings.points_per_win ?? 3) === 3
+                        ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30'
+                        : 'border-line bg-raise/40 hover:bg-raise'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-emerald-400 font-mono">STANDAR RESMI (AKTIF)</span>
+                      {(settings.points_per_win ?? 3) === 3 && (
+                        <span className="text-xs text-emerald-400 font-bold">✓ Terpilih</span>
+                      )}
+                    </div>
+                    <div className="font-display font-black text-sm text-text mt-1">3 Poin untuk Menang</div>
+                    <p className="text-[11px] text-muted mt-0.5 leading-snug">
+                      Regulasi resmi sepak bola (Menang: 3, Seri: 1, Kalah: 0). Klasemen langsung menghitung ulang seketika.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, points_per_win: 2 })}
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${
+                      settings.points_per_win === 2
+                        ? 'border-blue bg-blue/10 ring-2 ring-blue/30'
+                        : 'border-line bg-raise/40 hover:bg-raise'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-blue font-mono">TRADISIONAL</span>
+                      {settings.points_per_win === 2 && (
+                        <span className="text-xs text-blue font-bold">✓ Terpilih</span>
+                      )}
+                    </div>
+                    <div className="font-display font-black text-sm text-text mt-1">2 Poin untuk Menang</div>
+                    <p className="text-[11px] text-muted mt-0.5 leading-snug">
+                      Sistem turnamen 2 poin (Menang: 2, Seri: 1, Kalah: 0).
+                    </p>
+                  </button>
+                </div>
               </div>
             </div>
 

@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS `event_settings` (
   `passcode_scorer` VARCHAR(50) NOT NULL DEFAULT 'WASIT-2026',
   `active_category` VARCHAR(10) NOT NULL DEFAULT 'U12',
   `active_date` DATE NOT NULL DEFAULT '2026-10-10',
+  `points_per_win` INT NOT NULL DEFAULT 3,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
